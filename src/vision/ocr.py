@@ -14,16 +14,17 @@
 import copy
 import time
 import os
-
+import numpy as np
 from huggingface_hub import snapshot_download
 
-from api.utils.file_utils import get_project_base_directory
 from .operators import *
-import numpy as np
+
 import onnxruntime as ort
 
 from .postprocess import build_post_process
 from rag.settings import cron_logger
+
+from utils.file_utils import get_project_base_directory
 
 
 def transform(data, ops=None):
