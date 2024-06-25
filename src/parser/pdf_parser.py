@@ -12,29 +12,32 @@
 #
 
 import os
+import re
 import random
+import torch
 
 import xgboost as xgb
 from io import BytesIO
-import torch
-import re
+
 import pdfplumber
 import logging
 from PIL import Image, ImageDraw
 import numpy as np
 from timeit import default_timer as timer
 from PyPDF2 import PdfReader as pdf2_read
-
-from api.utils.file_utils import get_project_base_directory
-from deepdoc.vision import OCR, Recognizer, LayoutRecognizer, TableStructureRecognizer
-from rag.nlp import rag_tokenizer
 from copy import deepcopy
 from huggingface_hub import snapshot_download
+
+from src.vision import OCR, Recognizer, LayoutRecognizer, TableStructureRecognizer
+from utils.file_utils import get_project_base_directory
+
+from rag.nlp import rag_tokenizer
+
 
 logging.getLogger("pdfminer").setLevel(logging.WARNING)
 
 
-class RAGFlowPdfParser:
+class PdfParser:
     def __init__(self):
         self.ocr = OCR()
         if hasattr(self, "model_speciess"):
