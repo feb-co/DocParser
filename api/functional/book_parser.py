@@ -155,6 +155,6 @@ if __name__ == "__main__":
     import sys
 
     def dummy(prog=None, msg=""):
-        print('------', msg, flush=True)
+        print('------', prog, msg, flush=True)
 
     chunk(sys.argv[1], from_page=1, to_page=10, callback=dummy)
