@@ -15,11 +15,12 @@ from tika import parser
 import re
 from io import BytesIO
 
-from rag.nlp import bullets_category, is_english, tokenize, remove_contents_table, \
-    hierarchical_merge, make_colon_as_title, naive_merge, random_choices, tokenize_table, add_positions, \
+
+from src.parser import PdfParser, DocxParser, PlainParser, HtmlParser
+from utils.nlp import bullets_category, is_english, remove_contents_table, \
+    hierarchical_merge, make_colon_as_title, naive_merge, random_choices, tokenize_table, \
     tokenize_chunks, find_codec
-from rag.nlp import rag_tokenizer
-from deepdoc.parser import PdfParser, DocxParser, PlainParser, HtmlParser
+from utils.nlp import rag_tokenizer
 
 
 class Pdf(PdfParser):
