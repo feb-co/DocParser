@@ -29,9 +29,9 @@ from copy import deepcopy
 from huggingface_hub import snapshot_download
 
 from src.vision import OCR, Recognizer, LayoutRecognizer, TableStructureRecognizer
-from utils.file_utils import get_project_base_directory
 
-from rag.nlp import rag_tokenizer
+from utils.file_utils import get_project_base_directory
+from utils.nlp import rag_tokenizer
 
 
 logging.getLogger("pdfminer").setLevel(logging.WARNING)

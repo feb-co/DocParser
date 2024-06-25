@@ -17,10 +17,11 @@ from io import BytesIO
 
 
 from src.parser import PdfParser, DocxParser, PlainParser, HtmlParser
-from utils.nlp import bullets_category, is_english, remove_contents_table, \
-    hierarchical_merge, make_colon_as_title, naive_merge, random_choices, tokenize_table, \
-    tokenize_chunks, find_codec
-from utils.nlp import rag_tokenizer
+from utils.nlp import (
+    bullets_category, is_english, remove_contents_table,
+    hierarchical_merge, make_colon_as_title, naive_merge, random_choices, tokenize_table,
+    tokenize_chunks, find_codec, rag_tokenizer
+)
 
 
 class Pdf(PdfParser):
