@@ -20,7 +20,7 @@ import time
 import logging
 import re
 
-from api.utils.file_utils import get_project_base_directory
+from utils.file_utils import get_project_base_directory
 
 
 class Dealer:
@@ -29,7 +29,11 @@ class Dealer:
         self.lookup_num = 100000000
         self.load_tm = time.time() - 1000000
         self.dictionary = None
-        path = os.path.join(get_project_base_directory(), "rag/res", "synonym.json")
+        path = os.path.join(
+            get_project_base_directory(),
+            os.environ.get("DOC_PARSER_MODEL_DIR"), 
+            "synonym.json"
+        )
         try:
             self.dictionary = json.load(open(path, 'r'))
         except Exception as e:
