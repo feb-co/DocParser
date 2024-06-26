@@ -4,14 +4,18 @@ import os
 import numpy as np
 from huggingface_hub import snapshot_download
 
-from .operators import *
-
 import onnxruntime as ort
 
+from .operators import *
 from .postprocess import build_post_process
-from rag.settings import cron_logger
 
 from utils.file_utils import get_project_base_directory
+
+try:
+    from api.server.settings import cron_logger
+except:
+    import logging as cron_logger
+    cron_logger.basicConfig(level=cron_logger.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 def transform(data, ops=None):
