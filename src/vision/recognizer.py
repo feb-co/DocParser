@@ -17,7 +17,7 @@ from copy import deepcopy
 import onnxruntime as ort
 from huggingface_hub import snapshot_download
 
-from api.utils.file_utils import get_project_base_directory
+from utils.file_utils import get_project_base_directory
 from .operators import *
 from rag.settings import cron_logger
 
@@ -37,13 +37,16 @@ class Recognizer(object):
         """
         if not model_dir:
             model_dir = os.path.join(
-                        get_project_base_directory(),
-                        "rag/res/deepdoc")
+                get_project_base_directory(),
+                os.environ.get("DOC_PARSER_MODEL_DIR")
+            )
             model_file_path = os.path.join(model_dir, task_name + ".onnx")
             if not os.path.exists(model_file_path):
-                model_dir = snapshot_download(repo_id="InfiniFlow/deepdoc",
-                                              local_dir=os.path.join(get_project_base_directory(), "rag/res/deepdoc"),
-                                              local_dir_use_symlinks=False)
+                model_dir = snapshot_download(
+                    repo_id="InfiniFlow/deepdoc",
+                    local_dir=os.path.join(get_project_base_directory(), os.environ.get("DOC_PARSER_MODEL_DIR")),
+                    local_dir_use_symlinks=False
+                )
                 model_file_path = os.path.join(model_dir, task_name + ".onnx")
         else:
             model_file_path = os.path.join(model_dir, task_name + ".onnx")

@@ -1,16 +1,3 @@
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
-#
-
 import copy
 import time
 import os
@@ -482,14 +469,17 @@ class OCR(object):
         if not model_dir:
             try:
                 model_dir = os.path.join(
-                        get_project_base_directory(),
-                        "rag/res/deepdoc")
+                    get_project_base_directory(),
+                    os.environ.get("DOC_PARSER_MODEL_DIR")
+                )
                 self.text_detector = TextDetector(model_dir)
                 self.text_recognizer = TextRecognizer(model_dir)
             except Exception as e:
-                model_dir = snapshot_download(repo_id="InfiniFlow/deepdoc",
-                                              local_dir=os.path.join(get_project_base_directory(), "rag/res/deepdoc"),
-                                              local_dir_use_symlinks=False)
+                model_dir = snapshot_download(
+                    repo_id="InfiniFlow/deepdoc",
+                    local_dir=os.path.join(get_project_base_directory(), os.environ.get("DOC_PARSER_MODEL_DIR")),
+                    local_dir_use_symlinks=False
+                )
                 self.text_detector = TextDetector(model_dir)
                 self.text_recognizer = TextRecognizer(model_dir)
 

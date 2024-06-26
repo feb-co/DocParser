@@ -1,16 +1,3 @@
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
-#
-
 import os
 import re
 import random
@@ -52,13 +39,17 @@ class PdfParser:
         try:
             model_dir = os.path.join(
                 get_project_base_directory(),
-                "rag/res/deepdoc")
+                os.environ.get("DOC_PARSER_MODEL_DIR")
+            )
             self.updown_cnt_mdl.load_model(os.path.join(
                 model_dir, "updown_concat_xgb.model"))
         except Exception as e:
             model_dir = snapshot_download(
                 repo_id="InfiniFlow/text_concat_xgb_v1.0",
-                local_dir=os.path.join(get_project_base_directory(), "rag/res/deepdoc"),
+                local_dir=os.path.join(
+                    get_project_base_directory(),
+                    os.environ.get("DOC_PARSER_MODEL_DIR")
+                ),
                 local_dir_use_symlinks=False)
             self.updown_cnt_mdl.load_model(os.path.join(
                 model_dir, "updown_concat_xgb.model"))

@@ -40,13 +40,17 @@ class LayoutRecognizer(Recognizer):
     def __init__(self, domain):
         try:
             model_dir = os.path.join(
-                    get_project_base_directory(),
-                    "rag/res/deepdoc")
+                get_project_base_directory(),
+                os.environ.get("DOC_PARSER_MODEL_DIR")
+            )
             super().__init__(self.labels, domain, model_dir)
         except Exception as e:
-            model_dir = snapshot_download(repo_id="InfiniFlow/deepdoc",
-                                          local_dir=os.path.join(get_project_base_directory(), "rag/res/deepdoc"),
-                                          local_dir_use_symlinks=False)
+            model_dir = snapshot_download(
+                repo_id="InfiniFlow/deepdoc",
+                local_dir=os.path.join(
+                    get_project_base_directory(), os.environ.get("DOC_PARSER_MODEL_DIR")
+                    ),
+                local_dir_use_symlinks=False)
             super().__init__(self.labels, domain, model_dir)
 
         self.garbage_layouts = ["footer", "header", "reference"]

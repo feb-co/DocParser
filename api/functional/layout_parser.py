@@ -39,7 +39,8 @@ def main(args):
             "layout",
             os.path.join(
                 get_project_base_directory(),
-                "rag/res/deepdoc/"))
+                os.environ.get("DOC_PARSER_MODEL_DIR")
+            ))
     if args.mode.lower() == "tsr":
         labels = TableStructureRecognizer.labels
         detr = TableStructureRecognizer()
