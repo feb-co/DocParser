@@ -25,7 +25,8 @@ from hanziconv import HanziConv
 from huggingface_hub import snapshot_download
 from nltk import word_tokenize
 from nltk.stem import PorterStemmer, WordNetLemmatizer
-from api.utils.file_utils import get_project_base_directory
+
+from utils.file_utils import get_project_base_directory
 
 
 class RagTokenizer:

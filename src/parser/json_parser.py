@@ -1,10 +1,7 @@
-# -*- coding: utf-8 -*-
-# The following documents are mainly referenced, and only adaptation modifications have been made
-# from https://github.com/langchain-ai/langchain/blob/master/libs/text-splitters/langchain_text_splitters/json.py
-
 import json
 from typing import Any, Dict, List, Optional
-from rag.nlp import find_codec
+
+from utils.nlp import find_codec
 
 class RAGFlowJsonParser:
     def __init__(
