@@ -11,6 +11,10 @@
 #  limitations under the License.
 #
 import os, sys
+import argparse
+import re
+import numpy as np
+
 sys.path.insert(
     0,
     os.path.abspath(
@@ -21,10 +25,9 @@ sys.path.insert(
 
 from src.vision.seeit import draw_box
 from src.vision import Recognizer, LayoutRecognizer, TableStructureRecognizer, OCR, init_in_out
-from api.utils.file_utils import get_project_base_directory
-import argparse
-import re
-import numpy as np
+
+from utils.file_utils import get_project_base_directory
+
 
 
 def main(args):

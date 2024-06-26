@@ -1012,7 +1012,6 @@ class PdfParser:
             self.__ocr(i + 1, img, chars, zoomin)
             if callback and i % 6 == 5:
                 callback(prog=(i + 1) * 0.6 / len(self.page_images), msg="")
-        # print("OCR:", timer()-st)
 
         if not self.is_english and not any(
                 [c for c in self.page_chars]) and self.boxes:
