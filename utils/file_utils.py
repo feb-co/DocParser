@@ -24,7 +24,7 @@ from PIL import Image
 from cachetools import LRUCache, cached
 from ruamel.yaml import YAML
 
-from api.db import FileType
+from utils import FileType
 
 PROJECT_BASE = os.getenv("RAG_PROJECT_BASE") or os.getenv("RAG_DEPLOY_BASE")
 RAG_BASE = os.getenv("RAG_BASE")
