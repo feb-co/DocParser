@@ -2,5 +2,6 @@
 
 ## API/Functional
 ```shell
-export PYTHONPATH="$(pwd):$PYTHONPATH"; python /home/licheng/FinCode/DocParser/api/functional/book_parser.py
+cd PROJECT_DIR
+export PYTHONPATH="$(pwd):$PYTHONPATH"; python api/functional/book_parser.py
 ```
