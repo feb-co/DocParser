@@ -2,13 +2,16 @@ import re
 from tika import parser
 from io import BytesIO
 
+from dotenv import load_dotenv
+load_dotenv()
 
 from src.parser import PdfParser, DocxParser, PlainParser, HtmlParser
 from utils.nlp import (
     bullets_category, is_english, remove_contents_table,
     hierarchical_merge, make_colon_as_title, naive_merge, random_choices, tokenize_table,
-    tokenize_chunks, find_codec, rag_tokenizer
+    tokenize_chunks, find_codec
 )
+from utils.nlp.rag_tokenizer import Tokenizer as rag_tokenizer
 
 
 class Pdf(PdfParser):
@@ -141,9 +144,11 @@ def chunk(filename, binary=None, from_page=0, to_page=100000,
 
 
 if __name__ == "__main__":
+    import os
     import sys
-
+    
     def dummy(prog=None, msg=""):
         print('------', prog, msg, flush=True)
 
-    chunk(sys.argv[1], from_page=1, to_page=10, callback=dummy)
+    res = chunk(sys.argv[1], from_page=1, to_page=10, callback=dummy)
+    print(res)

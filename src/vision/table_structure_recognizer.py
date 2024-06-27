@@ -9,7 +9,7 @@ from huggingface_hub import snapshot_download
 from .recognizer import Recognizer
 
 from utils.file_utils import get_project_base_directory
-from utils.nlp import rag_tokenizer
+from utils.nlp.rag_tokenizer import Tokenizer as rag_tokenizer
 
 
 class TableStructureRecognizer(Recognizer):

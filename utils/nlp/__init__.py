@@ -8,10 +8,9 @@ from word2number import w2n
 from cn2an import cn2an
 from PIL import Image
 
-from . import rag_tokenizer
 
 from utils import num_tokens_from_string
-
+from .rag_tokenizer import Tokenizer as rag_tokenizer
 
 
 all_codecs = [
