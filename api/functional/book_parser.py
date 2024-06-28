@@ -9,15 +9,14 @@ from src.parser import PdfParser, DocxParser, PlainParser, HtmlParser
 from utils.nlp import (
     bullets_category, is_english, remove_contents_table,
     hierarchical_merge, make_colon_as_title, naive_merge, random_choices, tokenize_table,
-    tokenize_chunks, find_codec
+    tokenize_chunks, find_codec, rag_tokenizer
 )
-from utils.nlp.rag_tokenizer import Tokenizer as rag_tokenizer
 
 
 class Pdf(PdfParser):
     def __call__(self, filename, binary=None, from_page=0,
                  to_page=100000, zoomin=3, callback=None):
-        callback(msg="OCR is running...")
+        callback(0.0, msg="OCR is running...")
         self.__images__(
             filename if not binary else binary,
             zoomin,
@@ -30,7 +29,7 @@ class Pdf(PdfParser):
         start = timer()
         self._layouts_rec(zoomin)
         callback(0.67, "Layout analysis finished")
-        print("layouts:", timer() - start)
+
         self._table_transformer_job(zoomin)
         callback(0.68, "Table analysis finished")
         self._text_merge()
@@ -47,7 +46,7 @@ class Pdf(PdfParser):
 
 
 def chunk(filename, binary=None, from_page=0, to_page=100000,
-          lang="Chinese", callback=None, **kwargs):
+          lang="english", callback=None, **kwargs):
     """
         Supported file formats are docx, pdf, txt.
         Since a book is long and not all the parts are useful, if it's a PDF,
@@ -65,7 +64,10 @@ def chunk(filename, binary=None, from_page=0, to_page=100000,
         doc_parser = DocxParser()
         # TODO: table of contents need to be removed
         sections, tbls = doc_parser(
-            binary if binary else filename, from_page=from_page, to_page=to_page)
+            binary if binary else filename,
+            from_page=from_page,
+            to_page=to_page
+        )
         remove_contents_table(sections, eng=is_english(
             random_choices([t for t, _ in sections], k=200)))
         tbls = [((None, lns), None) for lns in tbls]
@@ -75,8 +77,12 @@ def chunk(filename, binary=None, from_page=0, to_page=100000,
         pdf_parser = Pdf() if kwargs.get(
             "parser_config", {}).get(
             "layout_recognize", True) else PlainParser()
-        sections, tbls = pdf_parser(filename if not binary else binary,
-                                    from_page=from_page, to_page=to_page, callback=callback)
+        sections, tbls = pdf_parser(
+            filename if not binary else binary,
+            from_page=from_page,
+            to_page=to_page,
+            callback=callback
+        )
 
     elif re.search(r"\.txt$", filename, re.IGNORECASE):
         callback(0.1, "Start to parse.")
@@ -123,8 +129,7 @@ def chunk(filename, binary=None, from_page=0, to_page=100000,
     bull = bullets_category(
         [t for t in random_choices([t for t, _ in sections], k=100)])
     if bull >= 0:
-        chunks = ["\n".join(ck)
-                  for ck in hierarchical_merge(bull, sections, 5)]
+        chunks = ["\n".join(ck) for ck in hierarchical_merge(bull, sections, 5)]
     else:
         sections = [s.split("@") for s, _ in sections]
         sections = [(pr[0], "@" + pr[1]) if len(pr) == 2 else (pr[0], '') for pr in sections ]
@@ -144,11 +149,9 @@ def chunk(filename, binary=None, from_page=0, to_page=100000,
 
 
 if __name__ == "__main__":
-    import os
     import sys
     
     def dummy(prog=None, msg=""):
-        print('------', prog, msg, flush=True)
+        print('>>>>>', prog, msg, flush=True)
 
-    res = chunk(sys.argv[1], from_page=1, to_page=10, callback=dummy)
-    print(res)
+    res = chunk(sys.argv[1], from_page=0, to_page=1, callback=dummy)

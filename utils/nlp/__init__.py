@@ -10,7 +10,7 @@ from PIL import Image
 
 
 from utils import num_tokens_from_string
-from .rag_tokenizer import Tokenizer as rag_tokenizer
+from . import rag_tokenizer
 
 
 all_codecs = [

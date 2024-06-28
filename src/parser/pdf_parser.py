@@ -18,7 +18,7 @@ from huggingface_hub import snapshot_download
 from src.vision import OCR, Recognizer, LayoutRecognizer, TableStructureRecognizer
 
 from utils.file_utils import get_project_base_directory
-from utils.nlp.rag_tokenizer import Tokenizer as rag_tokenizer
+from utils.nlp import rag_tokenizer
 
 
 logging.getLogger("pdfminer").setLevel(logging.WARNING)
@@ -77,10 +77,8 @@ class PdfParser:
         return min(abs(a["x1"] - b["x0"]), abs(a["x0"] - b["x1"]),
                    abs(a["x0"] + a["x1"] - b["x0"] - b["x1"]) / 2)
 
-    def _y_dis(
-            self, a, b):
-        return (
-                       b["top"] + b["bottom"] - a["top"] - a["bottom"]) / 2
+    def _y_dis(self, a, b):
+        return (b["top"] + b["bottom"] - a["top"] - a["bottom"]) / 2
 
     def _match_proj(self, b):
         proj_patt = [
@@ -268,9 +266,11 @@ class PdfParser:
 
     def __ocr(self, pagenum, img, chars, ZM=3):
         bxs = self.ocr.detect(np.array(img))
+
         if not bxs:
             self.boxes.append([])
             return
+
         bxs = [(line[0], line[1][0]) for line in bxs]
         bxs = Recognizer.sort_Y_firstly(
             [{"x0": b[0][0] / ZM, "x1": b[1][0] / ZM,
@@ -282,7 +282,9 @@ class PdfParser:
 
         # merge chars in the same rect
         for c in Recognizer.sort_X_firstly(
-                chars, self.mean_width[pagenum - 1] // 4):
+            chars, 
+            self.mean_width[pagenum - 1] // 4
+        ):
             ii = Recognizer.find_overlapped(c, bxs)
             if ii is None:
                 self.lefted_chars.append(c)
@@ -312,16 +314,20 @@ class PdfParser:
                                               for b in bxs])
         self.boxes.append(bxs)
 
-    def _layouts_rec(self, ZM, drop=True):
+    def _layouts_rec(self, zoomin, drop=True):
         assert len(self.page_images) == len(self.boxes)
+
         self.boxes, self.page_layout = self.layouter(
-            self.page_images, self.boxes, ZM, drop=drop)
+            self.page_images,
+            self.boxes,
+            zoomin,
+            drop=drop
+        )
+
         # cumlative Y
         for i in range(len(self.boxes)):
-            self.boxes[i]["top"] += \
-                self.page_cum_height[self.boxes[i]["page_number"] - 1]
-            self.boxes[i]["bottom"] += \
-                self.page_cum_height[self.boxes[i]["page_number"] - 1]
+            self.boxes[i]["top"] += self.page_cum_height[self.boxes[i]["page_number"] - 1]
+            self.boxes[i]["bottom"] += self.page_cum_height[self.boxes[i]["page_number"] - 1]
 
     def _text_merge(self):
         # merge adjusted boxes
@@ -339,95 +345,100 @@ class PdfParser:
         # horizontally merge adjacent box with the same layout
         i = 0
         while i < len(bxs) - 1:
-            b = bxs[i]
-            b_ = bxs[i + 1]
-            if b.get("layoutno", "0") != b_.get("layoutno", "1") or b.get("layout_type", "") in ["table", "figure",
+            bxs_c = bxs[i]
+            bxs_next = bxs[i + 1]
+
+            if bxs_c.get("layoutno", "0") != bxs_next.get("layoutno", "1") or bxs_c.get("layout_type", "") in ["table", "figure",
                                                                                                  "equation"]:
                 i += 1
                 continue
-            if abs(self._y_dis(b, b_)
-                   ) < self.mean_height[bxs[i]["page_number"] - 1] / 3:
+            
+            if abs(self._y_dis(bxs_c, bxs_next)) < self.mean_height[bxs[i]["page_number"] - 1] / 3:
                 # merge
-                bxs[i]["x1"] = b_["x1"]
-                bxs[i]["top"] = (b["top"] + b_["top"]) / 2
-                bxs[i]["bottom"] = (b["bottom"] + b_["bottom"]) / 2
-                bxs[i]["text"] += b_["text"]
+                bxs[i]["x1"] = bxs_next["x1"]
+                bxs[i]["top"] = (bxs_c["top"] + bxs_next["top"]) / 2
+                bxs[i]["bottom"] = (bxs_c["bottom"] + bxs_next["bottom"]) / 2
+                bxs[i]["text"] += bxs_next["text"]
                 bxs.pop(i + 1)
                 continue
+
             i += 1
             continue
-
-            dis_thr = 1
-            dis = b["x1"] - b_["x0"]
-            if b.get("layout_type", "") != "text" or b_.get(
-                    "layout_type", "") != "text":
-                if end_with(b, "，") or start_with(b_, "（，"):
-                    dis_thr = -8
-                else:
-                    i += 1
-                    continue
-
-            if abs(self._y_dis(b, b_)) < self.mean_height[bxs[i]["page_number"] - 1] / 5 \
-                    and dis >= dis_thr and b["x1"] < b_["x1"]:
-                # merge
-                bxs[i]["x1"] = b_["x1"]
-                bxs[i]["top"] = (b["top"] + b_["top"]) / 2
-                bxs[i]["bottom"] = (b["bottom"] + b_["bottom"]) / 2
-                bxs[i]["text"] += b_["text"]
-                bxs.pop(i + 1)
-                continue
-            i += 1
+        
         self.boxes = bxs
 
     def _naive_vertical_merge(self):
+        # count boxes in the same row as a feature
+        for i in range(len(self.boxes)):
+            mh = self.mean_height[self.boxes[i]["page_number"] - 1]
+            self.boxes[i]["in_row"] = 0
+            j = max(0, i - 12)
+            while j < min(i + 12, len(self.boxes)):
+                if j == i:
+                    j += 1
+                    continue
+                ydis = self._y_dis(self.boxes[i], self.boxes[j]) / mh
+                if abs(ydis) < 1:
+                    self.boxes[i]["in_row"] += 1
+                elif ydis > 0:
+                    break
+                j += 1
+
         bxs = Recognizer.sort_Y_firstly(
             self.boxes, np.median(
                 self.mean_height) / 3)
         i = 0
+
         while i + 1 < len(bxs):
-            b = bxs[i]
-            b_ = bxs[i + 1]
-            if b["page_number"] < b_["page_number"] and re.match(
-                    r"[0-9  •一—-]+$", b["text"]):
+            bxs_c = bxs[i]
+            bxs_next = bxs[i + 1]
+
+            # is invalid character
+            if bxs_c["page_number"] < bxs_next["page_number"] and re.match(
+                    r"[0-9  •一—-]+$", bxs_next["text"]):
                 bxs.pop(i)
                 continue
-            if not b["text"].strip():
+            if not bxs_c["text"].strip():
                 bxs.pop(i)
                 continue
-            concatting_feats = [
-                b["text"].strip()[-1] in ",;:'\"，、‘“；：-",
-                len(b["text"].strip()) > 1 and b["text"].strip(
-                )[-2] in ",;:'\"，‘“、；：",
-                b_["text"].strip() and b_["text"].strip()[0] in "。；？！?”）),，、：",
-            ]
+
+            # # features for concating
+            # is_concatting = [
+            #     bxs_c["text"].strip()[-1] in ",;:'\"，、‘“；：-",
+            #     len(bxs_c["text"].strip()) > 1 and bxs_c["text"].strip()[-2] in ",;:'\"，‘“、；：",
+            #     bxs_next["text"].strip() and bxs_next["text"].strip()[0] in "。；？！?”）),，、：",
+            # ]
+            concat_features = self._updown_concat_features(bxs_c, bxs_next)
+            is_concatting = self.updown_cnt_mdl.predict(xgb.DMatrix([concat_features]))[0] > 0.5
+
             # features for not concating
-            feats = [
-                b.get("layoutno", 0) != b_.get("layoutno", 0),
-                b["text"].strip()[-1] in "。？！?",
-                self.is_english and b["text"].strip()[-1] in ".!?",
-                b["page_number"] == b_["page_number"] and b_["top"] -
-                b["bottom"] > self.mean_height[b["page_number"] - 1] * 1.5,
-                b["page_number"] < b_["page_number"] and abs(
-                    b["x0"] - b_["x0"]) > self.mean_width[b["page_number"] - 1] * 4,
+            is_not_concatting = [
+                bxs_c.get("layoutno", 0) != bxs_next.get("layoutno", 0),
+                bxs_c["text"].strip()[-1] in "。？！?",
+                self.is_english and bxs_c["text"].strip()[-1] in ".!?",
+                bxs_c["page_number"] == bxs_next["page_number"] and bxs_next["top"] -
+                bxs_c["bottom"] > self.mean_height[bxs_next["page_number"] - 1] * 1.5,
+                bxs_c["page_number"] < bxs_next["page_number"] and abs(
+                    bxs_c["x0"] - bxs_next["x0"]) > self.mean_width[bxs_c["page_number"] - 1] * 4,
             ]
+
             # split features
-            detach_feats = [b["x1"] < b_["x0"],
-                            b["x0"] > b_["x1"]]
-            if (any(feats) and not any(concatting_feats)) or any(detach_feats):
-                print(
-                    b["text"],
-                    b_["text"],
-                    any(feats),
-                    any(concatting_feats),
-                    any(detach_feats))
+            detach_feats = [
+                bxs_c["x1"] < bxs_next["x0"],
+                bxs_c["x0"] > bxs_next["x1"]
+            ]
+            
+            if (any(is_not_concatting) and not is_concatting) or any(detach_feats):
                 i += 1
                 continue
+
             # merge up and down
-            b["bottom"] = b_["bottom"]
-            b["text"] += b_["text"]
-            b["x0"] = min(b["x0"], b_["x0"])
-            b["x1"] = max(b["x1"], b_["x1"])
+            bxs_c["bottom"] = bxs_next["bottom"]
+            bxs_c["text"] = bxs_c["text"] + ' ' + bxs_next["text"]
+            bxs_c["x0"] = min(bxs_c["x0"], bxs_next["x0"])
+            bxs_c["x1"] = max(bxs_c["x1"], bxs_next["x1"])
             bxs.pop(i + 1)
+        
         self.boxes = bxs
 
     def _concat_downward(self, concat_between_pages=True):
@@ -972,14 +983,13 @@ class PdfParser:
 
         logging.info("Images converted.")
         self.is_english = [re.search(r"[a-zA-Z0-9,/¸;:'\[\]\(\)!@#$%^&*\"?<>._-]{30,}", "".join(
-            random.choices([c["text"] for c in self.page_chars[i]], k=min(100, len(self.page_chars[i]))))) for i in
+            random.choices([c["text"] for c in self.page_chars[i] if len(c['text'].strip())>0], k=min(100, len(self.page_chars[i]))))) for i in
                            range(len(self.page_chars))]
         if sum([1 if e else 0 for e in self.is_english]) > len(
                 self.page_images) / 2:
             self.is_english = True
         else:
             self.is_english = False
-        self.is_english = False
 
         st = timer()
         for i, img in enumerate(self.page_images):
@@ -1010,7 +1020,7 @@ class PdfParser:
             self.is_english = re.search(r"[\na-zA-Z0-9,/¸;:'\[\]\(\)!@#$%^&*\"?<>._-]{30,}",
                                         "".join([b["text"] for b in random.choices(bxes, k=min(30, len(bxes)))]))
 
-        logging.info("Is it English:", self.is_english)
+        logging.info(f"Is it English: {self.is_english}")
 
         self.page_cum_height = np.cumsum(self.page_cum_height)
         assert len(self.page_cum_height) == len(self.page_images) + 1
