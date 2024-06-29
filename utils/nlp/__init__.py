@@ -185,6 +185,7 @@ def bullets_category(sections):
         for sec in sections:
             for p in pro:
                 if re.match(p, sec) and not not_bullet(sec):
+                    import pdb; pdb.set_trace()
                     hits[i] += 1
                     break
     maxium = 0

@@ -333,26 +333,17 @@ class PdfParser:
         # merge adjusted boxes
         bxs = self.boxes
 
-        def end_with(b, txt):
-            txt = txt.strip()
-            tt = b.get("text", "").strip()
-            return tt and tt.find(txt) == len(tt) - len(txt)
-
-        def start_with(b, txts):
-            tt = b.get("text", "").strip()
-            return tt and any([tt.find(t.strip()) == 0 for t in txts])
-
         # horizontally merge adjacent box with the same layout
         i = 0
         while i < len(bxs) - 1:
             bxs_c = bxs[i]
             bxs_next = bxs[i + 1]
 
-            if bxs_c.get("layoutno", "0") != bxs_next.get("layoutno", "1") or bxs_c.get("layout_type", "") in ["table", "figure",
-                                                                                                 "equation"]:
+            if bxs_c.get("layoutno", "0") != bxs_next.get("layoutno", "1") \
+                or bxs_c.get("layout_type", "") in ["table", "figure", "equation"]:
                 i += 1
                 continue
-            
+
             if abs(self._y_dis(bxs_c, bxs_next)) < self.mean_height[bxs[i]["page_number"] - 1] / 3:
                 # merge
                 bxs[i]["x1"] = bxs_next["x1"]
@@ -412,10 +403,11 @@ class PdfParser:
             is_concatting = self.updown_cnt_mdl.predict(xgb.DMatrix([concat_features]))[0] > 0.5
 
             # features for not concating
+            is_same_witdth = abs(bxs_c["x0"] - bxs_next["x0"])<0.5 and abs(bxs_c["x1"] - bxs_next["x1"])<0.5
             is_not_concatting = [
                 bxs_c.get("layoutno", 0) != bxs_next.get("layoutno", 0),
-                bxs_c["text"].strip()[-1] in "。？！?",
-                self.is_english and bxs_c["text"].strip()[-1] in ".!?",
+                bxs_c["text"].strip()[-1] in "。？！?" and not is_same_witdth,
+                self.is_english and bxs_c["text"].strip()[-1] in ".!?" and not is_same_witdth,
                 bxs_c["page_number"] == bxs_next["page_number"] and bxs_next["top"] -
                 bxs_c["bottom"] > self.mean_height[bxs_next["page_number"] - 1] * 1.5,
                 bxs_c["page_number"] < bxs_next["page_number"] and abs(
@@ -427,7 +419,7 @@ class PdfParser:
                 bxs_c["x1"] < bxs_next["x0"],
                 bxs_c["x0"] > bxs_next["x1"]
             ]
-            
+
             if (any(is_not_concatting) and not is_concatting) or any(detach_feats):
                 i += 1
                 continue
@@ -438,7 +430,7 @@ class PdfParser:
             bxs_c["x0"] = min(bxs_c["x0"], bxs_next["x0"])
             bxs_c["x1"] = max(bxs_c["x1"], bxs_next["x1"])
             bxs.pop(i + 1)
-        
+
         self.boxes = bxs
 
     def _concat_downward(self, concat_between_pages=True):
@@ -553,6 +545,7 @@ class PdfParser:
     def _filter_forpages(self):
         if not self.boxes:
             return
+        
         findit = False
         i = 0
         while i < len(self.boxes):
@@ -560,30 +553,35 @@ class PdfParser:
                             re.sub(r"( | |\u3000)+", "", self.boxes[i]["text"].lower())):
                 i += 1
                 continue
+
             findit = True
-            eng = re.match(
-                r"[0-9a-zA-Z :'.-]{5,}",
-                self.boxes[i]["text"].strip())
+            eng = re.match(r"[0-9a-zA-Z :'.-]{5,}", self.boxes[i]["text"].strip())
             self.boxes.pop(i)
             if i >= len(self.boxes):
                 break
-            prefix = self.boxes[i]["text"].strip()[:3] if not eng else " ".join(
-                self.boxes[i]["text"].strip().split(" ")[:2])
+
+            prefix = self.boxes[i]["text"].strip()[:3] \
+                if not eng else \
+                " ".join(self.boxes[i]["text"].strip().split(" ")[:2])
             while not prefix:
                 self.boxes.pop(i)
                 if i >= len(self.boxes):
                     break
-                prefix = self.boxes[i]["text"].strip()[:3] if not eng else " ".join(
-                    self.boxes[i]["text"].strip().split(" ")[:2])
+                prefix = self.boxes[i]["text"].strip()[:3] \
+                    if not eng else \
+                    " ".join(self.boxes[i]["text"].strip().split(" ")[:2])
+
             self.boxes.pop(i)
             if i >= len(self.boxes) or not prefix:
                 break
+
             for j in range(i, min(i + 128, len(self.boxes))):
                 if not re.match(prefix, self.boxes[j]["text"]):
                     continue
                 for k in range(i, j):
                     self.boxes.pop(i)
                 break
+
         if findit:
             return
 
@@ -594,6 +592,7 @@ class PdfParser:
         page_dirty = set([i + 1 for i, t in enumerate(page_dirty) if t > 3])
         if not page_dirty:
             return
+
         i = 0
         while i < len(self.boxes):
             if self.boxes[i]["page_number"] in page_dirty:
@@ -604,25 +603,28 @@ class PdfParser:
     def _merge_with_same_bullet(self):
         i = 0
         while i + 1 < len(self.boxes):
-            b = self.boxes[i]
-            b_ = self.boxes[i + 1]
-            if not b["text"].strip():
+            bxs_c = self.boxes[i]
+            bxs_next = self.boxes[i + 1]
+
+            if not bxs_c["text"].strip():
                 self.boxes.pop(i)
                 continue
-            if not b_["text"].strip():
+
+            if not bxs_next["text"].strip():
                 self.boxes.pop(i + 1)
                 continue
 
-            if b["text"].strip()[0] != b_["text"].strip()[0] \
-                    or b["text"].strip()[0].lower() in set("qwertyuopasdfghjklzxcvbnm") \
-                    or rag_tokenizer.is_chinese(b["text"].strip()[0]) \
-                    or b["top"] > b_["bottom"]:
+            if bxs_c["text"].strip()[0] != bxs_next["text"].strip()[0] \
+                or bxs_c["text"].strip()[0].lower() in set("qwertyuopasdfghjklzxcvbnm") \
+                or rag_tokenizer.is_chinese(bxs_c["text"].strip()[0]) \
+                or bxs_c["top"] > bxs_next["bottom"]:
                 i += 1
                 continue
-            b_["text"] = b["text"] + "\n" + b_["text"]
-            b_["x0"] = min(b["x0"], b_["x0"])
-            b_["x1"] = max(b["x1"], b_["x1"])
-            b_["top"] = b["top"]
+
+            bxs_next["text"] = bxs_c["text"] + "\n" + bxs_next["text"]
+            bxs_next["x0"] = min(bxs_c["x0"], bxs_next["x0"])
+            bxs_next["x1"] = max(bxs_c["x1"], bxs_next["x1"])
+            bxs_next["top"] = bxs_c["top"]
             self.boxes.pop(i)
 
     def _extract_table_figure(self, need_image, ZM,
@@ -843,14 +845,14 @@ class PdfParser:
                 return j
         return
 
-    def _line_tag(self, bx, ZM):
+    def _line_tag(self, bx, zoomin):
         pn = [bx["page_number"]]
         top = bx["top"] - self.page_cum_height[pn[0] - 1]
         bott = bx["bottom"] - self.page_cum_height[pn[0] - 1]
         page_images_cnt = len(self.page_images)
         if pn[-1] - 1 >= page_images_cnt: return ""
-        while bott * ZM > self.page_images[pn[-1] - 1].size[1]:
-            bott -= self.page_images[pn[-1] - 1].size[1] / ZM
+        while bott * zoomin > self.page_images[pn[-1] - 1].size[1]:
+            bott -= self.page_images[pn[-1] - 1].size[1] / zoomin
             pn.append(pn[-1] + 1)
             if pn[-1] - 1 >= page_images_cnt:
                 return ""
@@ -1023,9 +1025,10 @@ class PdfParser:
         logging.info(f"Is it English: {self.is_english}")
 
         self.page_cum_height = np.cumsum(self.page_cum_height)
+
         assert len(self.page_cum_height) == len(self.page_images) + 1
-        if len(self.boxes) == 0 and zoomin < 9: self.__images__(fnm, zoomin * 3, page_from,
-                                                                page_to, callback)
+        if len(self.boxes) == 0 and zoomin < 9: 
+            self.__images__(fnm, zoomin * 3, page_from, page_to, callback)
 
     def __call__(self, fnm, need_image=True, zoomin=3, return_html=False):
         self.__images__(fnm, zoomin)

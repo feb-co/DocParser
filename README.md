@@ -1,8 +1,8 @@
 # DocParser
 
 ## API/Functional
-### Test
+### PdfParser
 ```shell
 cd PROJECT_DIR
-export PYTHONPATH="$(pwd):$PYTHONPATH"; python api/functional/book_parser.py file_path
+export PYTHONPATH="$(pwd):$PYTHONPATH"; python api/functional/pdf_parser.py file_path
 ```
