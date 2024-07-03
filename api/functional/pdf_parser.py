@@ -1,5 +1,8 @@
-import pdfplumber
-from io import BytesIO
+import os
+import sys
+
+work_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(work_dir)
 
 from dotenv import load_dotenv
 load_dotenv()
