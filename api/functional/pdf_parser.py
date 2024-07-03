@@ -52,8 +52,11 @@ def parser(file_path, from_page, to_page, callback=None, postprocess=None):
 
 
 def get_document_total_pages(file_path, tokenizer_fn, chunk_token_size) -> int:
-    pdf = pdfplumber.open(file_path) if isinstance(file_path, str) else pdfplumber.open(BytesIO(file_path))
-    return len(pdf.pages)
+    pdf_page_number = Pdf.total_page_number(
+        file_path,
+        binary=not isinstance(file_path, str)
+    )
+    return pdf_page_number
 
 
 if __name__ == "__main__":
