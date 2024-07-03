@@ -1,5 +1,9 @@
+import pdfplumber
+from io import BytesIO
+
 from dotenv import load_dotenv
 load_dotenv()
+
 
 from src.parser import PdfParser
 
@@ -45,6 +49,11 @@ def parser(file_path, from_page, to_page, callback=None, postprocess=None):
         callback=callback
     )
     return postprocess(sections, tables)
+
+
+def get_document_total_pages(file_path, tokenizer_fn, chunk_token_size) -> int:
+    pdf = pdfplumber.open(file_path) if isinstance(file_path, str) else pdfplumber.open(BytesIO(file_path))
+    return len(pdf.pages)
 
 
 if __name__ == "__main__":
