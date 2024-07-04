@@ -16,7 +16,7 @@ import pandas as pd
 
 from . import regions
 
-from utils.nlp import rag_tokenizer
+from scripts.nlp import rag_tokenizer
 
 current_file_path = os.path.dirname(os.path.abspath(__file__))
 GOODS = pd.read_csv(os.path.join(current_file_path, "res/corp_baike_len.csv"), sep="\t", header=0).fillna(0)

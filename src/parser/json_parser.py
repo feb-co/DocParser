@@ -1,7 +1,7 @@
 import json
 from typing import Any, Dict, List, Optional
 
-from utils.nlp import find_codec
+from scripts.nlp import find_codec
 
 class RAGFlowJsonParser:
     def __init__(

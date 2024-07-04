@@ -26,7 +26,7 @@ from huggingface_hub import snapshot_download
 from nltk import word_tokenize
 from nltk.stem import PorterStemmer, WordNetLemmatizer
 
-from utils.file_utils import get_project_base_directory
+from scripts.file_utils import get_project_base_directory
 
 
 class RagTokenizer:

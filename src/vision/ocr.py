@@ -9,7 +9,7 @@ import onnxruntime as ort
 from .operators import *
 from .postprocess import build_post_process
 
-from utils.file_utils import get_project_base_directory
+from scripts.file_utils import get_project_base_directory
 
 try:
     from api.server.settings import cron_logger

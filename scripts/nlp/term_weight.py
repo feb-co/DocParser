@@ -20,8 +20,8 @@ import re
 import os
 import numpy as np
 
-from utils.file_utils import get_project_base_directory
-from utils.nlp import rag_tokenizer
+from scripts.file_utils import get_project_base_directory
+from scripts.nlp import rag_tokenizer
 
 
 class Dealer:

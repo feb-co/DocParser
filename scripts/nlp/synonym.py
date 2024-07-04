@@ -20,7 +20,7 @@ import time
 import logging
 import re
 
-from utils.file_utils import get_project_base_directory
+from scripts.file_utils import get_project_base_directory
 
 
 class Dealer:

@@ -19,7 +19,7 @@ from huggingface_hub import snapshot_download
 
 from src.vision import Recognizer
 
-from utils.file_utils import get_project_base_directory
+from scripts.file_utils import get_project_base_directory
 
 
 class LayoutRecognizer(Recognizer):

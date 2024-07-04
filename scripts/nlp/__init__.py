@@ -9,7 +9,7 @@ from cn2an import cn2an
 from PIL import Image
 
 
-from utils import num_tokens_from_string
+from scripts import num_tokens_from_string
 from . import rag_tokenizer
 
 

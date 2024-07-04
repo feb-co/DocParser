@@ -32,7 +32,7 @@ class Pdf(PdfParser):
         callback(0.68, "Table analysis finished")
 
         self._text_merge()
-        tbls = self._extract_table_figure(True, zoomin, True, True)
+        tables_figures = self._extract_table_figure(True, zoomin, True)
         self._naive_vertical_merge()
         self._filter_forpages()
         self._merge_with_same_bullet()
@@ -40,18 +40,22 @@ class Pdf(PdfParser):
         callback(0.75, "Text merging finished.")
         callback(0.8, "Text extraction finished")
 
-        return self.boxes, tbls
+        return self.boxes, tables_figures
 
 
 def parser(file_path, from_page, to_page, callback=None, postprocess=None):
     pdf_parser = Pdf()
-    sections, tables = pdf_parser(
+    sections, tables_figures = pdf_parser(
         file_path,
         from_page=from_page,
         to_page=to_page,
         callback=callback
     )
-    return postprocess(sections, tables)
+    results = sorted(
+        [bxs for bxs in sections+tables_figures],
+        key=lambda x: (x["top"], x["x0"]),
+    )
+    return postprocess(results)
 
 
 def get_document_total_pages(file_path, tokenizer_fn, chunk_token_size) -> int:
@@ -64,18 +68,21 @@ def get_document_total_pages(file_path, tokenizer_fn, chunk_token_size) -> int:
 
 if __name__ == "__main__":
     import sys
+    from scripts import markdown
     
     def dummy(prog=None, msg=""):
         # print('>>>>>', prog, msg, flush=True)
         pass
-    
-    def postprocess(sections, tables):
-        for sec in sections:
-            print(sec)
+
+    def postprocess(results):
+        results = markdown.markdown_text(results)
+        # results = markdown.markdown_table(results)
+        print('\n\n'.join([res['text'] for res in results]))        
 
     res = parser(
         sys.argv[1],
-        from_page=0,
-        to_page=1,
-        callback=dummy
+        from_page=1,
+        to_page=2,
+        callback=dummy,
+        postprocess=postprocess
     )

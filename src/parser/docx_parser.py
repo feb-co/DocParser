@@ -4,7 +4,7 @@ import pandas as pd
 from collections import Counter
 from io import BytesIO
 
-from utils.nlp import rag_tokenizer
+from scripts.nlp import rag_tokenizer
 
 
 class RAGFlowDocxParser:

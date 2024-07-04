@@ -26,7 +26,7 @@ sys.path.insert(
 from src.vision.seeit import draw_box
 from src.vision import Recognizer, LayoutRecognizer, TableStructureRecognizer, OCR, init_in_out
 
-from utils.file_utils import get_project_base_directory
+from scripts.file_utils import get_project_base_directory
 
 
 

@@ -2,7 +2,7 @@ import readability
 import html_text
 import chardet
 
-from utils.nlp import find_codec
+from scripts.nlp import find_codec
 
 def get_encoding(file):
     with open(file,'rb') as f:
