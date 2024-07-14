@@ -703,7 +703,7 @@ class PdfParser:
                 "layout_type"
             ] in ["table caption", "title", "figure caption", "reference"]:
                 nomerge_lout_no.append(lst_lout_no)
-            
+
             if self.boxes[i]["layout_type"] == "table":
                 if re.match(r"(数据|资料|图表)*来源[:： ]", self.boxes[i]["text"]):
                     self.boxes.pop(i)
@@ -1066,30 +1066,9 @@ class PdfParser:
             logging.warning(f"Miss outlines")
 
         logging.info("Images converted.")
-        self.is_english = [
-            re.search(
-                r"[a-zA-Z0-9,/¸;:'\[\]\(\)!@#$%^&*\"?<>._-]{30,}",
-                "".join(
-                    random.choices(
-                        [
-                            c["text"]
-                            for c in self.page_chars[i]
-                            if len(c["text"].strip()) > 0
-                        ],
-                        k=min(100, len(self.page_chars[i])),
-                    )
-                ),
-            )
-            for i in range(len(self.page_chars))
-        ]
-        if sum([1 if e else 0 for e in self.is_english]) > len(self.page_images) / 2:
-            self.is_english = True
-        else:
-            self.is_english = False
 
-        st = timer()
         for i, img in enumerate(self.page_images):
-            chars = self.page_chars[i] if not self.is_english else []
+            chars = []
             self.mean_height.append(
                 np.median(sorted([c["height"] for c in chars])) if chars else 0
             )
@@ -1114,6 +1093,50 @@ class PdfParser:
             self.__ocr(i + 1, img, chars, zoomin)
             if callback and i % 6 == 5:
                 callback(prog=(i + 1) * 0.6 / len(self.page_images), msg="")
+
+        self.is_english = [
+            re.search(
+                r"[a-zA-Z0-9,/¸;:'\[\]\(\)!@#$%^&*\"?<>._-]{30,}",
+                "".join(
+                    random.choices(
+                        [
+                            c["text"]
+                            for c in self.boxes[i]
+                            if len(c["text"].strip()) > 0
+                        ],
+                        k=min(100, len(self.boxes[i])),
+                    )
+                ),
+            )
+            for i in range(len(self.boxes))
+        ]
+        if sum([1 if e else 0 for e in self.is_english]) > len(self.page_images) / 2:
+            self.is_english = True
+        else:
+            self.is_english = False
+            self.boxes = []
+            self.mean_height = []
+            self.mean_width = []
+            self.page_cum_height = [0]
+            for i, img in enumerate(self.page_images):
+                chars = self.page_chars[i]
+                self.mean_height.append(
+                    np.median(sorted([c["height"] for c in chars])) if chars else 0
+                )
+                self.mean_width.append(
+                    np.median(sorted([c["width"] for c in chars])) if chars else 8
+                )
+                self.page_cum_height.append(img.size[1] / zoomin)
+                j = 0
+                while j + 1 < len(chars):
+                    if chars[j]["text"] and chars[j + 1]["text"] \
+                            and re.match(r"[0-9a-zA-Z,.:;!%]+", chars[j]["text"] + chars[j + 1]["text"]) \
+                            and chars[j + 1]["x0"] - chars[j]["x1"] >= min(chars[j + 1]["width"],
+                                                                        chars[j]["width"]) / 2:
+                        chars[j]["text"] += " "
+                    j += 1
+
+                self.__ocr(i + 1, img, chars, zoomin)
 
         if not self.is_english and not any([c for c in self.page_chars]) and self.boxes:
             bxes = [b for bxs in self.boxes for b in bxs]

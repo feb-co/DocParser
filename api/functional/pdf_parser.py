@@ -58,7 +58,7 @@ def parser(file_path, from_page, to_page, callback=None, postprocess=None):
     return postprocess(results)
 
 
-def get_document_total_pages(file_path, tokenizer_fn, chunk_token_size) -> int:
+def get_document_total_pages(file_path, tokenizer_fn=None, chunk_token_size=None) -> int:
     pdf_page_number = Pdf.total_page_number(
         file_path,
         binary=not isinstance(file_path, str)

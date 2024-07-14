@@ -161,14 +161,16 @@ class TableStructureRecognizer(Recognizer):
                 boxes[i],
                 boxes[i + 1] if len(boxes) > i + 1 else None,
                 min([b["x0"] for b in boxes]),
-                is_first=(i==0 and len(boxes) > i + 1 and boxes[i]['R'] != boxes[i+1]['R'])
+                is_first=(i==0 and len(boxes) > i + 1 and boxes[i].get("R", "") != boxes[i+1].get("R", ""))
             ):
                 if is_english:
-                    cap + " "
+                    cap += " "
                 cap += boxes[i]["text"]
                 boxes.pop(i)
                 i -= 1
             i += 1
+        
+        cap = cap.strip()
 
         if not boxes:
             return []
