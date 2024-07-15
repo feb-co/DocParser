@@ -5,11 +5,13 @@ from bs4 import BeautifulSoup
 
 
 def can_convert_to_markdown(html_table):
-    soup = BeautifulSoup(html_table, 'html.parser')
-    table = soup.find('table')
+    soup = BeautifulSoup(html_table, "html.parser")
+    table = soup.find("table")
 
     # 检测是否存在合并的单元格
-    if table.find_all(['th', 'td'], attrs={"rowspan": True}) or table.find_all(['th', 'td'], attrs={"colspan": True}):
+    if table.find_all(["th", "td"], attrs={"rowspan": True}) or table.find_all(
+        ["th", "td"], attrs={"colspan": True}
+    ):
         return False
 
     # 检测是否包含内嵌的HTML元素
@@ -30,17 +32,24 @@ def html_to_markdown(html_table):
     return df.to_markdown(index=False)
 
 
-
 def markdown_text(boxes: list) -> list:
     new_boxes = copy.deepcopy(boxes)
     for box in new_boxes:
-        if box.get('layout_type', 'text') == 'title':
-            if box.get('layoutno', '') == 'title-0':
-                box['text'] = '# ' + box['text']
-            elif box.get('layoutno', '') == 'title-1':
-                box['text'] = '## ' + box['text']
-            elif box.get('layoutno', '') == 'title-2':
-                box['text'] = '### ' + box['text']
+        if box.get("layout_type", "text") == "title":
+            box["text"] = box["text"].strip().replace("   ", " ").replace("  ", " ")
+            if box.get("layoutno", "") == "title-0":
+                box["text"] = "# " + box["text"]
+            elif box.get("layoutno", "") == "title-1":
+                box["text"] = "## " + box["text"]
+            elif box.get("layoutno", "") == "title-2":
+                box["text"] = "### " + box["text"]
+
+        if box.get("layout_type", "text") == "reference":
+            box["text"] = box["text"].strip().replace("   ", " ").replace("  ", " ")
+            if box.get("layoutno", "") == "reference-0":
+                box["text"] = "- " + box["text"]
+            elif box.get("layoutno", "") == "reference-1":
+                box["text"] = "---\n\n" + box["text"]
 
     return new_boxes
 
@@ -48,8 +57,8 @@ def markdown_text(boxes: list) -> list:
 def markdown_table(boxes: list) -> list:
     new_boxes = copy.deepcopy(boxes)
     for box in new_boxes:
-        if box.get('layout_type', 'text') == 'table':
-            box['text'] = html_to_markdown(box['text'])
+        if box.get("layout_type", "text") == "table":
+            box["text"] = html_to_markdown(box["text"])
 
     return new_boxes
 
@@ -86,3 +95,18 @@ def markdown_equation(s: str) -> str:
     # lists
 
     return s
+
+
+def format_table(boxes: list) -> list:
+    new_boxes = copy.deepcopy(boxes)
+    for box in new_boxes:
+        if box.get("layout_type", "text") == "table":
+            box["text"] = (
+                box["text"]
+                .replace("<td   >", "<td>")
+                .replace("<th   >", "<th>")
+                .replace("<td  >", "<td>")
+                .replace("<th  >", "<th>")
+            )
+
+    return new_boxes

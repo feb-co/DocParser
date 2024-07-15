@@ -1,6 +1,5 @@
 import os
 import re
-import random
 import torch
 
 import xgboost as xgb
@@ -432,12 +431,58 @@ class PdfParser:
             ):
                 bxs.pop(i)
                 continue
+
             if not bxs_c["text"].strip():
                 bxs.pop(i)
                 continue
 
+            if (
+                "layout_type" in bxs_c
+                and (
+                    bxs_c["layout_type"] == "figure caption"
+                    or bxs_c["layout_type"] == ""
+                )
+                and "layout_type" in bxs_next
+                and (
+                    bxs_next["layout_type"] == "figure caption"
+                    or bxs_next["layout_type"] == ""
+                )
+            ):
+                if (
+                    ("," in bxs_c["text"] or "，" in bxs_c["text"])
+                    and abs(bxs_c["bottom"] - bxs_next["bottom"]) > 1
+                    and abs(bxs_c["x0"] - bxs_next["x0"]) > 1.5
+                ):
+                    bxs_c["layout_type"] = "text"
+
+            if (
+                "layout_type" in bxs_c
+                and bxs_c["layout_type"] == "figure"
+                and "layout_type" in bxs_next
+                and bxs_next["layout_type"] == "figure caption"
+            ):
+                if ("," in bxs_next["text"] or "，" in bxs_next["text"]) and (
+                    ". " in bxs_next["text"] or "。" in bxs_next["text"]
+                ):
+                    bxs_next["layout_type"] = "text"
+
+            if (
+                i - 1 >= 0
+                and "layout_type" in bxs[i - 1]
+                and bxs[i - 1]["layout_type"] in ("figure caption", "text")
+                and "layout_type" in bxs_c
+                and bxs_c["layout_type"] == "figure caption"
+                and "layout_type" in bxs_next
+                and bxs_next["layout_type"] == "table caption"
+            ):
+                bxs_c["layout_type"] = "text"
+
             # features for concating
-            concat_features = self._updown_concat_features(bxs_c, bxs_next)
+            try:
+                concat_features = self._updown_concat_features(bxs_c, bxs_next)
+            except:
+                i += 1
+                continue
             is_concatting = (
                 self.updown_cnt_mdl.predict(xgb.DMatrix([concat_features]))[0] > 0.5
             )
@@ -448,7 +493,11 @@ class PdfParser:
                 and abs(bxs_c["x1"] - bxs_next["x1"]) < 1.0
             )
             is_not_concatting = [
-                bxs_c.get("layoutno", 0) != bxs_next.get("layoutno", 0),
+                (
+                    "layoutno" in bxs_c
+                    and "layoutno" in bxs_next
+                    and bxs_c.get("layoutno", 0) != bxs_next.get("layoutno", 0)
+                ),
                 bxs_c["text"].strip()[-1] in "。？！?" and not is_same_witdth,
                 self.is_english
                 and bxs_c["text"].strip()[-1] in ".!?"
@@ -694,11 +743,11 @@ class PdfParser:
             if "layoutno" not in self.boxes[i]:
                 i += 1
                 continue
-            
+
             lout_no = (
                 str(self.boxes[i]["page_number"]) + "-" + str(self.boxes[i]["layoutno"])
             )
-            
+
             if TableStructureRecognizer.is_caption(self.boxes[i]) or self.boxes[i][
                 "layout_type"
             ] in ["table caption", "title", "figure caption", "reference"]:
@@ -854,18 +903,19 @@ class PdfParser:
 
             poss = []
             crop_image = cropout(bxs, "figure", poss)
-            res.append({
-                "x0": poss[0][1],
-                "x1": poss[0][2],
-                "top": poss[0][3],
-                "bottom": poss[0][4],
-                "text": txt,
-                "page_number": poss[0][0],
-                "layout_type": "figure",
-                "layoutno": k,
-                "image": crop_image
-                
-            })
+            res.append(
+                {
+                    "x0": poss[0][1],
+                    "x1": poss[0][2],
+                    "top": poss[0][3],
+                    "bottom": poss[0][4],
+                    "text": txt,
+                    "page_number": poss[0][0],
+                    "layout_type": "figure",
+                    "layoutno": k,
+                    "image": crop_image,
+                }
+            )
 
         # crop table out and add caption
         for k, bxs in tables.items():
@@ -876,20 +926,21 @@ class PdfParser:
             )
             poss = []
             crop_image = cropout(bxs, "table", poss)
-            res.append({
-                "x0": poss[0][1],
-                "x1": poss[0][2],
-                "top": poss[0][3],
-                "bottom": poss[0][4],
-                "text": self.tbl_det.construct_table(
-                    bxs, html=return_html, is_english=self.is_english
-                ),
-                "page_number": poss[0][0],
-                "layout_type": "table",
-                "layoutno": k,
-                "image": crop_image
-                
-            })
+            res.append(
+                {
+                    "x0": poss[0][1],
+                    "x1": poss[0][2],
+                    "top": poss[0][3],
+                    "bottom": poss[0][4],
+                    "text": self.tbl_det.construct_table(
+                        bxs, html=return_html, is_english=self.is_english
+                    ),
+                    "page_number": poss[0][0],
+                    "layout_type": "table",
+                    "layoutno": k,
+                    "image": crop_image,
+                }
+            )
 
         return res
 
@@ -1019,7 +1070,9 @@ class PdfParser:
         except Exception as e:
             logging.error(str(e))
 
-    def __images__(self, fnm, zoomin=3, page_from=0, page_to=299, callback=None):
+    def __images__(
+        self, fnm, zoomin=3, page_from=0, page_to=299, callback=None, is_english=None
+    ):
         self.lefted_chars = []
         self.mean_height = []
         self.mean_width = []
@@ -1028,7 +1081,6 @@ class PdfParser:
         self.page_cum_height = [0]
         self.page_layout = []
         self.page_from = page_from
-        st = timer()
         try:
             self.pdf = (
                 pdfplumber.open(fnm)
@@ -1094,58 +1146,66 @@ class PdfParser:
             if callback and i % 6 == 5:
                 callback(prog=(i + 1) * 0.6 / len(self.page_images), msg="")
 
-        self.is_english = [
-            re.search(
-                r"[a-zA-Z0-9,/¸;:'\[\]\(\)!@#$%^&*\"?<>._-]{30,}",
-                "".join(
-                    random.choices(
-                        [
-                            c["text"]
-                            for c in self.boxes[i]
-                            if len(c["text"].strip()) > 0
-                        ],
-                        k=min(100, len(self.boxes[i])),
+        if is_english is None:
+            self.is_english = [
+                re.search(
+                    r"[a-zA-Z0-9,/¸;:'\[\]\(\)!@#$%^&*\"?<>._-]{30,}",
+                    "".join(
+                        [c["text"] for c in self.boxes[i] if len(c["text"].strip()) > 0]
+                    ),
+                )
+                for i in range(len(self.boxes))
+            ]
+
+            if (
+                sum([1 if e else 0 for e in self.is_english])
+                > len(self.page_images) / 2
+            ):
+                self.is_english = True
+            else:
+                self.is_english = False
+                self.boxes = []
+                self.mean_height = []
+                self.mean_width = []
+                self.page_cum_height = [0]
+                for i, img in enumerate(self.page_images):
+                    chars = self.page_chars[i]
+                    self.mean_height.append(
+                        np.median(sorted([c["height"] for c in chars])) if chars else 0
                     )
-                ),
-            )
-            for i in range(len(self.boxes))
-        ]
-        if sum([1 if e else 0 for e in self.is_english]) > len(self.page_images) / 2:
-            self.is_english = True
+                    self.mean_width.append(
+                        np.median(sorted([c["width"] for c in chars])) if chars else 8
+                    )
+                    self.page_cum_height.append(img.size[1] / zoomin)
+                    j = 0
+                    while j + 1 < len(chars):
+                        if (
+                            chars[j]["text"]
+                            and chars[j + 1]["text"]
+                            and re.match(
+                                r"[0-9a-zA-Z,.:;!%]+",
+                                chars[j]["text"] + chars[j + 1]["text"],
+                            )
+                            and chars[j + 1]["x0"] - chars[j]["x1"]
+                            >= min(chars[j + 1]["width"], chars[j]["width"]) / 2
+                        ):
+                            chars[j]["text"] += " "
+                        j += 1
+
+                    self.__ocr(i + 1, img, chars, zoomin)
+
+            if (
+                not self.is_english
+                and not any([c for c in self.page_chars])
+                and self.boxes
+            ):
+                bxes = [b for bxs in self.boxes for b in bxs]
+                self.is_english = re.search(
+                    r"[\na-zA-Z0-9,/¸;:'\[\]\(\)!@#$%^&*\"?<>._-]{30,}",
+                    "".join([b["text"] for b in bxes]),
+                )
         else:
-            self.is_english = False
-            self.boxes = []
-            self.mean_height = []
-            self.mean_width = []
-            self.page_cum_height = [0]
-            for i, img in enumerate(self.page_images):
-                chars = self.page_chars[i]
-                self.mean_height.append(
-                    np.median(sorted([c["height"] for c in chars])) if chars else 0
-                )
-                self.mean_width.append(
-                    np.median(sorted([c["width"] for c in chars])) if chars else 8
-                )
-                self.page_cum_height.append(img.size[1] / zoomin)
-                j = 0
-                while j + 1 < len(chars):
-                    if chars[j]["text"] and chars[j + 1]["text"] \
-                            and re.match(r"[0-9a-zA-Z,.:;!%]+", chars[j]["text"] + chars[j + 1]["text"]) \
-                            and chars[j + 1]["x0"] - chars[j]["x1"] >= min(chars[j + 1]["width"],
-                                                                        chars[j]["width"]) / 2:
-                        chars[j]["text"] += " "
-                    j += 1
-
-                self.__ocr(i + 1, img, chars, zoomin)
-
-        if not self.is_english and not any([c for c in self.page_chars]) and self.boxes:
-            bxes = [b for bxs in self.boxes for b in bxs]
-            self.is_english = re.search(
-                r"[\na-zA-Z0-9,/¸;:'\[\]\(\)!@#$%^&*\"?<>._-]{30,}",
-                "".join(
-                    [b["text"] for b in random.choices(bxes, k=min(30, len(bxes)))]
-                ),
-            )
+            self.is_english = is_english
 
         logging.info(f"Is it English: {self.is_english}")
 
