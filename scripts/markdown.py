@@ -35,6 +35,9 @@ def html_to_markdown(html_table):
 def markdown_text(boxes: list) -> list:
     new_boxes = copy.deepcopy(boxes)
     for box in new_boxes:
+        if box.get("layout_type", "text") == "text":
+            box["text"] = box["text"].strip().replace("   ", " ").replace("  ", " ")
+
         if box.get("layout_type", "text") == "title":
             box["text"] = box["text"].strip().replace("   ", " ").replace("  ", " ")
             if box.get("layoutno", "") == "title-0":
