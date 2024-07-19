@@ -15,5 +15,6 @@ readability-lxml==0.8.1
 shapely==2.0.3
 StrEnum==0.4.15
 tika
+transformers
 word2number==1.1
 xgboost==2.0.3

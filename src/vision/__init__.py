@@ -14,12 +14,13 @@
 import pdfplumber
 
 from .ocr import OCR
+from .nougat import Nougat
 from .recognizer import Recognizer
 from .layout_recognizer import LayoutRecognizer
 from .table_structure_recognizer import TableStructureRecognizer
 
 
-def init_in_out(args):
+def init_in_out(inputs, output_dir):
     from PIL import Image
     import os
     import traceback
@@ -28,8 +29,8 @@ def init_in_out(args):
     images = []
     outputs = []
 
-    if not os.path.exists(args.output_dir):
-        os.mkdir(args.output_dir)
+    if not os.path.exists(output_dir):
+        os.mkdir(output_dir)
 
     def pdf_pages(fnm, zoomin=3):
         nonlocal outputs, images
@@ -51,12 +52,12 @@ def init_in_out(args):
         except Exception as e:
             traceback.print_exc()
 
-    if os.path.isdir(args.inputs):
-        for fnm in traversal_files(args.inputs):
+    if os.path.isdir(inputs):
+        for fnm in traversal_files(inputs):
             images_and_outputs(fnm)
     else:
-        images_and_outputs(args.inputs)
+        images_and_outputs(inputs)
 
-    for i in range(len(outputs)): outputs[i] = os.path.join(args.output_dir, outputs[i])
+    for i in range(len(outputs)): outputs[i] = os.path.join(output_dir, outputs[i])
 
     return images, outputs

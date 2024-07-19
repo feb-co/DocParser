@@ -2,9 +2,9 @@ import copy
 import time
 import os
 import numpy as np
-from huggingface_hub import snapshot_download
-
 import onnxruntime as ort
+
+from huggingface_hub import snapshot_download
 
 from .operators import *
 from .postprocess import build_post_process

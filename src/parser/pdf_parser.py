@@ -14,7 +14,13 @@ from PyPDF2 import PdfReader as pdf2_read
 from copy import deepcopy
 from huggingface_hub import snapshot_download
 
-from src.vision import OCR, Recognizer, LayoutRecognizer, TableStructureRecognizer
+from src.vision import (
+    OCR,
+    Nougat,
+    Recognizer,
+    LayoutRecognizer,
+    TableStructureRecognizer,
+)
 
 from scripts.file_utils import get_project_base_directory
 from scripts.nlp import rag_tokenizer
@@ -26,6 +32,7 @@ logging.getLogger("pdfminer").setLevel(logging.WARNING)
 class PdfParser:
     def __init__(self):
         self.ocr = OCR()
+        self.nougat = Nougat()
         if hasattr(self, "model_speciess"):
             self.layouter = LayoutRecognizer("layout." + self.model_speciess)
         else:
@@ -332,31 +339,35 @@ class PdfParser:
                 bxs[ii]["text"] += c["text"]
 
         for b in bxs:
-            if not b["text"]:
-                left, right, top, bott = (
-                    b["x0"] * ZM,
-                    b["x1"] * ZM,
-                    b["top"] * ZM,
-                    b["bottom"] * ZM,
-                )
-                b["text"] = self.ocr.recognize(
-                    np.array(img),
-                    np.array(
-                        [[left, top], [right, top], [right, bott], [left, bott]],
-                        dtype=np.float32,
-                    ),
-                )
+            # if not b["text"]:
+            left, right, top, bott = (
+                b["x0"] * ZM,
+                b["x1"] * ZM,
+                b["top"] * ZM,
+                b["bottom"] * ZM,
+            )
+            b["x0"] *= ZM
+            b["x1"] *= ZM
+            b["top"] *= ZM
+            b["bottom"] *= ZM
+            b["text"] = self.ocr.recognize(
+                np.array(img),
+                np.array(
+                    [[left, top], [right, top], [right, bott], [left, bott]],
+                    dtype=np.float32,
+                ),
+            )
             del b["txt"]
         bxs = [b for b in bxs if b["text"]]
         if self.mean_height[-1] == 0:
             self.mean_height[-1] = np.median([b["bottom"] - b["top"] for b in bxs])
         self.boxes.append(bxs)
 
-    def _layouts_rec(self, zoomin, drop=True):
+    def _layouts_rec(self, drop=True):
         assert len(self.page_images) == len(self.boxes)
 
         self.boxes, self.page_layout = self.layouter(
-            self.page_images, self.boxes, zoomin, drop=drop
+            self.page_images, self.boxes, drop=drop
         )
 
         # cumlative Y
@@ -432,7 +443,7 @@ class PdfParser:
                 bxs.pop(i)
                 continue
 
-            if not bxs_c["text"].strip():
+            if not bxs_c["text"].strip() and bxs_c["layout_type"] in ("text"):
                 bxs.pop(i)
                 continue
 
@@ -709,16 +720,18 @@ class PdfParser:
             bxs_c = self.boxes[i]
             bxs_next = self.boxes[i + 1]
 
-            if not bxs_c["text"].strip():
+            if not bxs_c["text"].strip() and bxs_c["layout_type"] in ("text"):
                 self.boxes.pop(i)
                 continue
 
-            if not bxs_next["text"].strip():
+            if not bxs_next["text"].strip() and bxs_next["layout_type"] in ("text"):
                 self.boxes.pop(i + 1)
                 continue
 
             if (
-                bxs_c["text"].strip()[0] != bxs_next["text"].strip()[0]
+                not bxs_c["text"].strip()
+                or not bxs_next["text"].strip()
+                or bxs_c["text"].strip()[0] != bxs_next["text"].strip()[0]
                 or bxs_c["text"].strip()[0].lower() in set("qwertyuopasdfghjklzxcvbnm")
                 or rag_tokenizer.is_chinese(bxs_c["text"].strip()[0])
                 or bxs_c["top"] > bxs_next["bottom"]
@@ -846,31 +859,30 @@ class PdfParser:
 
         def cropout(bxs, ltype, poss):
             nonlocal ZM
-            pn = set([b["page_number"] - 1 for b in bxs])
+            pn = set([b["page_number"] for b in bxs])
             if len(pn) < 2:
                 pn = list(pn)[0]
-                ht = self.page_cum_height[pn]
+                ht = self.page_cum_height[pn - 1]
                 b = {
                     "x0": np.min([b["x0"] for b in bxs]),
                     "top": np.min([b["top"] for b in bxs]) - ht,
                     "x1": np.max([b["x1"] for b in bxs]),
                     "bottom": np.max([b["bottom"] for b in bxs]) - ht,
                 }
-                louts = [l for l in self.page_layout[pn] if l["type"] == ltype]
+                louts = [l for l in self.page_layout[pn - 1] if l["type"] == ltype]
                 ii = Recognizer.find_overlapped(b, louts, naive=True)
                 if ii is not None:
                     b = louts[ii]
                 else:
                     logging.warn(
-                        f"Missing layout match: {pn + 1},%s"
-                        % (bxs[0].get("layoutno", ""))
+                        f"Missing layout match: {pn},%s" % (bxs[0].get("layoutno", ""))
                     )
 
                 left, top, right, bott = b["x0"], b["top"], b["x1"], b["bottom"]
                 if right < left:
                     right = left + 1
-                poss.append((pn + self.page_from, left, right, top, bott))
-                return self.page_images[pn].crop(
+                poss.append((pn, left, right, top, bott))
+                return self.page_images[pn - 1].crop(
                     (left * ZM, top * ZM, right * ZM, bott * ZM)
                 )
             pn = {}
@@ -984,6 +996,23 @@ class PdfParser:
         return "@@{}\t{:.1f}\t{:.1f}\t{:.1f}\t{:.1f}##".format(
             "-".join([str(p) for p in pn]), bx["x0"], bx["x1"], top, bott
         )
+
+    def _text_predict(self, ZM=3):
+        for i in range(len(self.boxes)):
+            if self.boxes[i]["layout_type"] in ("text", "equation", ""):
+                left, top, right, bott = (
+                    self.boxes[i]["x0"],
+                    self.boxes[i]["top"],
+                    self.boxes[i]["x1"],
+                    self.boxes[i]["bottom"],
+                )
+                if right < left:
+                    right = left + 1
+                image = self.page_images[self.boxes[i]["page_number"] - 1].crop(
+                    (left, top, right, bott)
+                )
+                text = self.nougat(image)
+                self.boxes[i]['text'] = text
 
     def __filterout_scraps(self, boxes, ZM):
 
@@ -1145,6 +1174,7 @@ class PdfParser:
             self.__ocr(i + 1, img, chars, zoomin)
             if callback and i % 6 == 5:
                 callback(prog=(i + 1) * 0.6 / len(self.page_images), msg="")
+            self.boxes
 
         if is_english is None:
             self.is_english = [
@@ -1227,143 +1257,6 @@ class PdfParser:
 
     def remove_tag(self, txt):
         return re.sub(r"@@[\t0-9.-]+?##", "", txt)
-
-    def crop(self, text, ZM=3, need_position=False):
-        imgs = []
-        poss = []
-        for tag in re.findall(r"@@[0-9-]+\t[0-9.\t]+##", text):
-            pn, left, right, top, bottom = tag.strip("#").strip("@").split("\t")
-            left, right, top, bottom = (
-                float(left),
-                float(right),
-                float(top),
-                float(bottom),
-            )
-            poss.append(([int(p) - 1 for p in pn.split("-")], left, right, top, bottom))
-        if not poss:
-            if need_position:
-                return None, None
-            return
-
-        max_width = max(np.max([right - left for (_, left, right, _, _) in poss]), 6)
-        GAP = 6
-        pos = poss[0]
-        poss.insert(
-            0, ([pos[0][0]], pos[1], pos[2], max(0, pos[3] - 120), max(pos[3] - GAP, 0))
-        )
-        pos = poss[-1]
-        poss.append(
-            (
-                [pos[0][-1]],
-                pos[1],
-                pos[2],
-                min(self.page_images[pos[0][-1]].size[1] / ZM, pos[4] + GAP),
-                min(self.page_images[pos[0][-1]].size[1] / ZM, pos[4] + 120),
-            )
-        )
-
-        positions = []
-        for ii, (pns, left, right, top, bottom) in enumerate(poss):
-            right = left + max_width
-            bottom *= ZM
-            for pn in pns[1:]:
-                bottom += self.page_images[pn - 1].size[1]
-            imgs.append(
-                self.page_images[pns[0]].crop(
-                    (
-                        left * ZM,
-                        top * ZM,
-                        right * ZM,
-                        min(bottom, self.page_images[pns[0]].size[1]),
-                    )
-                )
-            )
-            if 0 < ii < len(poss) - 1:
-                positions.append(
-                    (
-                        pns[0] + self.page_from,
-                        left,
-                        right,
-                        top,
-                        min(bottom, self.page_images[pns[0]].size[1]) / ZM,
-                    )
-                )
-            bottom -= self.page_images[pns[0]].size[1]
-            for pn in pns[1:]:
-                imgs.append(
-                    self.page_images[pn].crop(
-                        (
-                            left * ZM,
-                            0,
-                            right * ZM,
-                            min(bottom, self.page_images[pn].size[1]),
-                        )
-                    )
-                )
-                if 0 < ii < len(poss) - 1:
-                    positions.append(
-                        (
-                            pn + self.page_from,
-                            left,
-                            right,
-                            0,
-                            min(bottom, self.page_images[pn].size[1]) / ZM,
-                        )
-                    )
-                bottom -= self.page_images[pn].size[1]
-
-        if not imgs:
-            if need_position:
-                return None, None
-            return
-        height = 0
-        for img in imgs:
-            height += img.size[1] + GAP
-        height = int(height)
-        width = int(np.max([i.size[0] for i in imgs]))
-        pic = Image.new("RGB", (width, height), (245, 245, 245))
-        height = 0
-        for ii, img in enumerate(imgs):
-            if ii == 0 or ii + 1 == len(imgs):
-                img = img.convert("RGBA")
-                overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
-                overlay.putalpha(128)
-                img = Image.alpha_composite(img, overlay).convert("RGB")
-            pic.paste(img, (0, int(height)))
-            height += img.size[1] + GAP
-
-        if need_position:
-            return pic, positions
-        return pic
-
-    def get_position(self, bx, ZM):
-        poss = []
-        pn = bx["page_number"]
-        top = bx["top"] - self.page_cum_height[pn - 1]
-        bott = bx["bottom"] - self.page_cum_height[pn - 1]
-        poss.append(
-            (
-                pn,
-                bx["x0"],
-                bx["x1"],
-                top,
-                min(bott, self.page_images[pn - 1].size[1] / ZM),
-            )
-        )
-        while bott * ZM > self.page_images[pn - 1].size[1]:
-            bott -= self.page_images[pn - 1].size[1] / ZM
-            top = 0
-            pn += 1
-            poss.append(
-                (
-                    pn,
-                    bx["x0"],
-                    bx["x1"],
-                    top,
-                    min(bott, self.page_images[pn - 1].size[1] / ZM),
-                )
-            )
-        return poss
 
 
 class PlainParser(object):

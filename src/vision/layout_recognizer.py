@@ -1,15 +1,3 @@
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
-#
 import os
 import re
 from collections import Counter
@@ -53,11 +41,9 @@ class LayoutRecognizer(Recognizer):
             )
             super().__init__(self.labels, domain, model_dir)
 
-        self.garbage_layouts = ["footer", "header"]
+        self.garbage_layouts = ["footer", "header", "equation"]
 
-    def __call__(
-        self, image_list, ocr_res, scale_factor=3, thr=0.2, batch_size=16, drop=True
-    ):
+    def __call__(self, image_list, ocr_res, thr=0.2, batch_size=16, drop=True):
         def __is_garbage(b):
             patt = [
                 r"^•+$",
@@ -86,11 +72,11 @@ class LayoutRecognizer(Recognizer):
                 {
                     "type": b["type"],
                     "score": float(b["score"]),
-                    "x0": b["bbox"][0] / scale_factor,
-                    "x1": b["bbox"][2] / scale_factor,
-                    "top": b["bbox"][1] / scale_factor,
-                    "bottom": b["bbox"][-1] / scale_factor,
-                    "page_number": pn,
+                    "x0": b["bbox"][0],
+                    "x1": b["bbox"][2],
+                    "top": b["bbox"][1],
+                    "bottom": b["bbox"][-1],
+                    "page_number": pn+1,
                 }
                 for b in lts
             ]
@@ -109,6 +95,7 @@ class LayoutRecognizer(Recognizer):
                     if bxs[i].get("layout_type"):
                         i += 1
                         continue
+
                     if __is_garbage(bxs[i]):
                         bxs.pop(i)
                         continue
@@ -118,13 +105,16 @@ class LayoutRecognizer(Recognizer):
                         bxs[i]["layout_type"] = ""
                         i += 1
                         continue
-                    lts_[ii]["visited"] = True
+
+                    lts_[ii]["visited"] = (
+                        True if lts_[ii]["type"] not in ("equation", 'figure') else False
+                    )
+
                     keep_feats = [
                         lts_[ii]["type"] == "footer"
-                        and bxs[i]["bottom"]
-                        < image_list[pn].size[1] * 0.9 / scale_factor,
+                        and bxs[i]["bottom"] < image_list[pn].size[1] * 0.9,
                         lts_[ii]["type"] == "header"
-                        and bxs[i]["top"] > image_list[pn].size[1] * 0.1 / scale_factor,
+                        and bxs[i]["top"] > image_list[pn].size[1] * 0.1,
                     ]
                     if (
                         drop
@@ -138,22 +128,20 @@ class LayoutRecognizer(Recognizer):
                         continue
 
                     bxs[i]["layoutno"] = f"{ty}-{ii}"
-                    bxs[i]["layout_type"] = (
-                        lts_[ii]["type"] if lts_[ii]["type"] != "equation" else "figure"
-                    )
+                    bxs[i]["layout_type"] = lts_[ii]["type"]
                     i += 1
 
             for lt in [
+                "equation",
+                "figure",
+                "table",
                 "footer",
                 "header",
                 "reference",
                 "figure caption",
                 "table caption",
                 "title",
-                "table",
                 "text",
-                "figure",
-                "equation",
             ]:
                 findLayout(lt)
 
@@ -164,10 +152,12 @@ class LayoutRecognizer(Recognizer):
                 if lt.get("visited"):
                     continue
                 lt = deepcopy(lt)
-                del lt["type"]
                 lt["text"] = ""
-                lt["layout_type"] = "figure"
-                lt["layoutno"] = f"figure-{i}"
+                lt["layout_type"] = lt["type"]
+                lt["layoutno"] = f"{lt['type']}-{i}"
+                del lt["type"]
+                del lt["visited"]
+                del lt["score"]
                 bxs.append(lt)
 
             boxes.extend(bxs)
