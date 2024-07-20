@@ -1012,7 +1012,8 @@ class PdfParser:
                     (left, top, right, bott)
                 )
                 text = self.nougat(image)
-                self.boxes[i]['text'] = text
+                if len(text) > 0 and '[MISSING_PAGE_POST]' not in text:
+                    self.boxes[i]['text'] = text
 
     def __filterout_scraps(self, boxes, ZM):
 

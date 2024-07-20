@@ -87,9 +87,9 @@ class LayoutRecognizer(Recognizer):
             page_layout.append(lts)
 
             # Tag layout type, layouts are ready
-            def findLayout(ty):
+            def findLayout():
                 nonlocal bxs, lts, self
-                lts_ = [lt for lt in lts if lt["type"] == ty]
+                lts_ = [lt for lt in lts]
                 i = 0
                 while i < len(bxs):
                     if bxs[i].get("layout_type"):
@@ -100,10 +100,11 @@ class LayoutRecognizer(Recognizer):
                         bxs.pop(i)
                         continue
 
-                    ii = self.find_overlapped_with_threashold(bxs[i], lts_, thr=0.4)
-                    if ii is None:  # belong to nothing
-                        bxs[i]["layout_type"] = ""
-                        i += 1
+                    ii = self.find_overlapped_with_threashold(bxs[i], lts_, thr=0.1)
+                    if ii is None:
+                        bxs.pop(i)
+                        # bxs[i]["layout_type"] = ""
+                        # i += 1
                         continue
 
                     lts_[ii]["visited"] = (
@@ -127,23 +128,11 @@ class LayoutRecognizer(Recognizer):
                         bxs.pop(i)
                         continue
 
-                    bxs[i]["layoutno"] = f"{ty}-{ii}"
+                    bxs[i]["layoutno"] = f"{lts_[ii]['type']}-{ii}"
                     bxs[i]["layout_type"] = lts_[ii]["type"]
                     i += 1
 
-            for lt in [
-                "equation",
-                "figure",
-                "table",
-                "footer",
-                "header",
-                "reference",
-                "figure caption",
-                "table caption",
-                "title",
-                "text",
-            ]:
-                findLayout(lt)
+            findLayout()
 
             # add box to figure layouts which has not text box
             for i, lt in enumerate(
