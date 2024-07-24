@@ -21,11 +21,21 @@ class TableStructureRecognizer(Recognizer):
         "table projected row header",
         "table spanning cell",
     ]
+    
+    labels_priority = {
+        "table": 5,
+        "table column": 4,
+        "table row": 3,
+        "table column header": 2,
+        "table projected row header": 1,
+        "table spanning cell": 0,
+    }
 
     def __init__(self):
         try:
             super().__init__(
                 self.labels,
+                self.labels_priority,
                 "tsr",
                 os.path.join(
                     get_project_base_directory(), os.environ.get("DOC_PARSER_MODEL_DIR")
@@ -34,6 +44,7 @@ class TableStructureRecognizer(Recognizer):
         except Exception as e:
             super().__init__(
                 self.labels,
+                self.labels_priority,
                 "tsr",
                 snapshot_download(
                     repo_id="InfiniFlow/deepdoc",

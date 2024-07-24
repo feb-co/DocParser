@@ -24,13 +24,26 @@ class LayoutRecognizer(Recognizer):
         "Reference",
         "Equation",
     ]
+    
+    labels_priority = {
+        "Table caption": 0,
+        "Table": 1,
+        "Figure caption": 2,
+        "Equation": 3,
+        "Figure": 4,
+        "Title": 5,
+        "Header": 6,
+        "Footer": 7,
+        "Text": 8,
+        "Reference": 9,
+    }
 
     def __init__(self, domain):
         try:
             model_dir = os.path.join(
                 get_project_base_directory(), os.environ.get("DOC_PARSER_MODEL_DIR")
             )
-            super().__init__(self.labels, domain, model_dir)
+            super().__init__(self.labels, self.labels_priority, domain, model_dir)
         except Exception as e:
             model_dir = snapshot_download(
                 repo_id="InfiniFlow/deepdoc",
@@ -39,7 +52,7 @@ class LayoutRecognizer(Recognizer):
                 ),
                 local_dir_use_symlinks=False,
             )
-            super().__init__(self.labels, domain, model_dir)
+            super().__init__(self.labels, self.labels_priority, domain, model_dir)
 
         self.garbage_layouts = ["footer", "header", "equation"]
 
