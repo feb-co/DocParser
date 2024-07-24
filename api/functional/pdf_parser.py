@@ -53,7 +53,7 @@ class Pdf(PdfParser):
         callback(0.9, msg="table figure process finished")
 
         results = sorted(
-            [bxs for bxs in self.boxes+tables],
+            [bxs for bxs in self.boxes + tables],
             key=lambda x: (x["top"], x["x0"]),
         )
         return results
