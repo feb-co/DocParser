@@ -38,21 +38,25 @@ class Pdf(PdfParser):
         self._layouts_rec()
         callback(0.4, "Layout analysis finished")
 
-        self._table_transformer_job(zoomin)
-        callback(0.5, "Table analysis finished")
-
         self._text_merge()
         self._naive_vertical_merge()
-        callback(0.6, "Text merging finished.")
+        callback(0.5, "Text merging finished.")
 
         self._filter_forpages()
         self._merge_with_same_bullet()
-        callback(0.7, "Text extraction finished")
+        callback(0.6, "Text extraction finished")
 
         self._text_predict(zoomin)
-        callback(0.8, msg="Nougat predict finished")
+        callback(0.7, msg="Nougat predict finished")
 
-        return self.boxes
+        tables = self._extract_table_figure(False, True)
+        callback(0.9, msg="table figure process finished")
+
+        results = sorted(
+            [bxs for bxs in self.boxes+tables],
+            key=lambda x: (x["top"], x["x0"]),
+        )
+        return results
 
 
 def parser(
@@ -108,5 +112,5 @@ if __name__ == "__main__":
         )
 
     res = parser(
-        sys.argv[1], from_page=84, to_page=85, callback=dummy, postprocess=postprocess
+        sys.argv[1], from_page=1, to_page=2, callback=dummy, postprocess=postprocess
     )

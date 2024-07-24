@@ -43,7 +43,7 @@ class LayoutRecognizer(Recognizer):
 
         self.garbage_layouts = ["footer", "header", "equation"]
 
-    def __call__(self, image_list, ocr_res, thr=0.2, batch_size=16, drop=True):
+    def __call__(self, image_list, ocr_res, thr=0.2, batch_size=16, drop=True, update_pos=True):
         def __is_garbage(b):
             patt = [
                 r"^•+$",
@@ -127,9 +127,14 @@ class LayoutRecognizer(Recognizer):
                         garbages[lts_[ii]["type"]].append(bxs[i]["text"])
                         bxs.pop(i)
                         continue
-
+                    
                     bxs[i]["layoutno"] = f"{lts_[ii]['type']}-{ii}"
                     bxs[i]["layout_type"] = lts_[ii]["type"]
+                    if update_pos:
+                        bxs[i]["x0"] = lts_[ii]["x0"]
+                        bxs[i]["x1"] = lts_[ii]["x1"]
+                        bxs[i]["top"] = lts_[ii]["top"]
+                        bxs[i]["bottom"] = lts_[ii]["bottom"]
                     i += 1
 
             findLayout()

@@ -9,7 +9,6 @@ import pdfplumber
 import logging
 from PIL import Image
 import numpy as np
-from timeit import default_timer as timer
 from PyPDF2 import PdfReader as pdf2_read
 from copy import deepcopy
 from huggingface_hub import snapshot_download
@@ -200,60 +199,12 @@ class PdfParser:
                     return False
         return True
 
-    def _table_transformer_job(self, ZM):
-        logging.info("Table processing...")
-        imgs, pos = [], []
-        tbcnt = [0]
-        MARGIN = 10
-        self.tb_cpns = []
-        assert len(self.page_layout) == len(self.page_images)
-        for p, tbls in enumerate(self.page_layout):  # for page
-            tbls = [f for f in tbls if f["type"] == "table"]
-            tbcnt.append(len(tbls))
-            if not tbls:
-                continue
-            for tb in tbls:  # for table
-                left, top, right, bott = (
-                    tb["x0"] - MARGIN,
-                    tb["top"] - MARGIN,
-                    tb["x1"] + MARGIN,
-                    tb["bottom"] + MARGIN,
-                )
-                left *= ZM
-                top *= ZM
-                right *= ZM
-                bott *= ZM
-                pos.append((left, top))
-                imgs.append(self.page_images[p].crop((left, top, right, bott)))
-
-        assert len(self.page_images) == len(tbcnt) - 1
-        if not imgs:
-            return
-        recos = self.tbl_det(imgs)
-        tbcnt = np.cumsum(tbcnt)
-        for i in range(len(tbcnt) - 1):  # for page
-            pg = []
-            for j, tb_items in enumerate(recos[tbcnt[i] : tbcnt[i + 1]]):  # for table
-                poss = pos[tbcnt[i] : tbcnt[i + 1]]
-                for it in tb_items:  # for table components
-                    it["x0"] = it["x0"] + poss[j][0]
-                    it["x1"] = it["x1"] + poss[j][0]
-                    it["top"] = it["top"] + poss[j][1]
-                    it["bottom"] = it["bottom"] + poss[j][1]
-                    for n in ["x0", "x1", "top", "bottom"]:
-                        it[n] /= ZM
-                    it["top"] += self.page_cum_height[i]
-                    it["bottom"] += self.page_cum_height[i]
-                    it["pn"] = i
-                    it["layoutno"] = j
-                    pg.append(it)
-            self.tb_cpns.extend(pg)
-
+    def __table_transformer_job(self, table_bxs, table_layout):
         def gather(kwd, fzy=10, ption=0.6):
             eles = Recognizer.sort_Y_firstly(
-                [r for r in self.tb_cpns if re.match(kwd, r["label"])], fzy
+                [r for r in table_layout if re.match(kwd, r["label"])], fzy
             )
-            eles = Recognizer.layouts_cleanup(self.boxes, eles, 5, ption)
+            eles = Recognizer.layouts_cleanup(table_bxs, eles, 5, ption)
             return Recognizer.sort_Y_firstly(eles, 0)
 
         # add R,H,C,SP tag to boxes within table layout
@@ -261,13 +212,11 @@ class PdfParser:
         rows = gather(r".* (row|header)")
         spans = gather(r".*spanning")
         clmns = sorted(
-            [r for r in self.tb_cpns if re.match(r"table column$", r["label"])],
-            key=lambda x: (x["pn"], x["layoutno"], x["x0"]),
+            [r for r in table_layout if re.match(r"table column$", r["label"])],
+            key=lambda x: (x["pn"], x["x0"]),
         )
-        clmns = Recognizer.layouts_cleanup(self.boxes, clmns, 5, 0.5)
-        for b in self.boxes:
-            if b.get("layout_type", "") != "table":
-                continue
+        clmns = Recognizer.layouts_cleanup(table_bxs, clmns, 5, 0.5)
+        for b in table_bxs:
             ii = Recognizer.find_overlapped_with_threashold(b, rows, thr=0.3)
             if ii is not None:
                 b["R"] = ii
@@ -295,6 +244,8 @@ class PdfParser:
                 b["H_left"] = spans[ii]["x0"]
                 b["H_right"] = spans[ii]["x1"]
                 b["SP"] = ii
+        
+        return table_bxs
 
     def __ocr(self, pagenum, img, chars, ZM=3):
         bxs = self.ocr.detect(np.array(img))
@@ -745,7 +696,7 @@ class PdfParser:
             bxs_next["top"] = bxs_c["top"]
             self.boxes.pop(i)
 
-    def _extract_table_figure(self, need_image, ZM, return_html):
+    def _extract_table_figure(self, need_image, return_html):
         tables = {}
         figures = {}
         # extract figure and table boxes
@@ -858,7 +809,6 @@ class PdfParser:
         res = []
 
         def cropout(bxs, ltype, poss):
-            nonlocal ZM
             pn = set([b["page_number"] for b in bxs])
             if len(pn) < 2:
                 pn = list(pn)[0]
@@ -882,9 +832,9 @@ class PdfParser:
                 if right < left:
                     right = left + 1
                 poss.append((pn, left, right, top, bott))
-                return self.page_images[pn - 1].crop(
-                    (left * ZM, top * ZM, right * ZM, bott * ZM)
-                )
+                new_img = self.page_images[pn - 1].crop((left, top, right, bott))
+                return new_img
+
             pn = {}
             for b in bxs:
                 p = b["page_number"] - 1
@@ -930,6 +880,76 @@ class PdfParser:
             )
 
         # crop table out and add caption
+        logging.info("Table processing...")
+        def extract_table_from_img(img, start_x, start_y, page_number):
+            bxs = self.ocr.detect(np.array(img))
+            if not bxs:
+                return None
+
+            bxs = [(line[0], line[1][0]) for line in bxs]
+            bxs = Recognizer.sort_Y_firstly(
+                [
+                    {
+                        "x0": b[0][0],
+                        "x1": b[1][0],
+                        "top": b[0][1],
+                        "bottom": b[-1][1],
+                        "text": "",
+                        "txt": t,
+                        "page_number": page_number,
+                    }
+                    for b, t in bxs
+                    if b[0][0] <= b[1][0] and b[0][1] <= b[-1][1]
+                ],
+                self.mean_height[-1] / 3,
+            )
+
+            for b in bxs:
+                # if not b["text"]:
+                left, right, top, bott = (
+                    b["x0"],
+                    b["x1"],
+                    b["top"],
+                    b["bottom"],
+                )
+                b["text"] = self.ocr.recognize(
+                    np.array(img),
+                    np.array(
+                        [[left, top], [right, top], [right, bott], [left, bott]],
+                        dtype=np.float32,
+                    ),
+                )
+                del b["txt"]
+
+            bxs, _ = self.layouter(
+                [img], [bxs], drop=True, update_pos=False
+            )
+            bxs = [b for b in bxs if b["text"]]
+            for b in bxs:
+                b["x0"] += start_x
+                b["x1"] += start_x
+                b["top"] += start_y
+                b["bottom"] += start_y
+                if b['layout_type'] == 'figure':
+                    b['layout_type'] = 'table'
+                elif 'caption' in b['layout_type']:
+                    b['layout_type'] = 'table caption'
+                else:
+                    b['layout_type'] = 'table'
+
+                del b['layoutno']
+
+            # table layout
+            table_layout = self.tbl_det([img])[0]
+            for item in table_layout:
+                item["x0"] += start_x
+                item["x1"] += start_x
+                item["top"] += start_y
+                item["bottom"] += start_y
+                item["pn"] = page_number
+
+            return bxs, table_layout
+
         for k, bxs in tables.items():
             if not bxs:
                 continue
@@ -945,12 +965,20 @@ class PdfParser:
                     "top": poss[0][3],
                     "bottom": poss[0][4],
                     "text": self.tbl_det.construct_table(
-                        bxs, html=return_html, is_english=self.is_english
+                        self.__table_transformer_job(
+                            *extract_table_from_img(
+                                crop_image,
+                                start_x=poss[0][1],
+                                start_y=poss[0][3],
+                                page_number=poss[0][0],
+                            )
+                        ),
+                        html=return_html,
+                        is_english=self.is_english,
                     ),
                     "page_number": poss[0][0],
                     "layout_type": "table",
-                    "layoutno": k,
-                    "image": crop_image,
+                    "layoutno": k
                 }
             )
 
@@ -1012,8 +1040,8 @@ class PdfParser:
                     (left, top, right, bott)
                 )
                 text = self.nougat(image)
-                if len(text) > 0 and '[MISSING_PAGE_POST]' not in text:
-                    self.boxes[i]['text'] = text
+                if len(text) > 0 and "[MISSING_PAGE_POST]" not in text:
+                    self.boxes[i]["text"] = text
 
     def __filterout_scraps(self, boxes, ZM):
 

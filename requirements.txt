@@ -1,8 +1,10 @@
+albumentations
 cn2an==0.5.22
 datrie==0.8.2
 hanziconv==0.3.2
 html_text==0.6.2
 lxml==5.1.0
+nougat
 opencv-python==4.9.0.80
 openpyxl==3.1.2
 pdfplumber
