@@ -46,7 +46,7 @@ class Pdf(PdfParser):
         self._merge_with_same_bullet()
         callback(0.6, "Text extraction finished")
 
-        self._text_predict(zoomin)
+        self._text_predict()
         callback(0.7, msg="Nougat predict finished")
 
         tables = self._extract_table_figure(False, True)
@@ -89,6 +89,7 @@ if __name__ == "__main__":
     import json
     from scripts import markdown
     from scripts.rendering import pdf_rendering
+    from scripts.openai import openai
 
     def dummy(prog=None, msg=""):
         # print('>>>>>', prog, msg, flush=True)
@@ -104,13 +105,10 @@ if __name__ == "__main__":
         page_images[0].save(
             "/home/licheng/output.pdf", save_all=True, append_images=page_images[1:]
         )
-        json.dump(
-            [item for item in results if item["layout_type"] != "figure"],
-            open("/home/licheng/output.json", "w", encoding="utf-8"),
-            ensure_ascii=False,
-            indent=2,
-        )
+        text = '\n\n'.join([item['text'] for item in results if item["layout_type"] != "figure"])
+        text = openai.format_data(text)
+        open('/home/licheng/output.txt', 'w', encoding='utf-8').write(text)
 
     res = parser(
-        sys.argv[1], from_page=1, to_page=2, callback=dummy, postprocess=postprocess
+        sys.argv[1], from_page=3, to_page=4, callback=dummy, postprocess=postprocess
     )

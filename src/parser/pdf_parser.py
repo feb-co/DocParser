@@ -1025,14 +1025,15 @@ class PdfParser:
             "-".join([str(p) for p in pn]), bx["x0"], bx["x1"], top, bott
         )
 
-    def _text_predict(self, ZM=3):
+    def _text_predict(self,):
+        MARGIN_VALUE = 30
         for i in range(len(self.boxes)):
             if self.boxes[i]["layout_type"] in ("text", "equation", ""):
                 left, top, right, bott = (
-                    self.boxes[i]["x0"],
-                    self.boxes[i]["top"],
-                    self.boxes[i]["x1"],
-                    self.boxes[i]["bottom"],
+                    self.boxes[i]["x0"] - MARGIN_VALUE,
+                    self.boxes[i]["top"] - MARGIN_VALUE,
+                    self.boxes[i]["x1"] + MARGIN_VALUE,
+                    self.boxes[i]["bottom"] + MARGIN_VALUE,
                 )
                 if right < left:
                     right = left + 1

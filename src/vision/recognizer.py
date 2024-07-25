@@ -497,7 +497,6 @@ class Recognizer(object):
 
         boxes = []
         overlapping_groups = find_overlapping_boxes(indices)
-        print(overlapping_groups, flush=True)
         for group in overlapping_groups:
             if len(group) == 1:
                 boxes.append(

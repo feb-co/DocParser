@@ -29,12 +29,12 @@ class LayoutRecognizer(Recognizer):
         "Table caption": 0,
         "Table": 1,
         "Figure caption": 2,
-        "Equation": 3,
-        "Figure": 4,
-        "Title": 5,
-        "Header": 6,
-        "Footer": 7,
-        "Text": 8,
+        "Title": 3,
+        "Header": 4,
+        "Footer": 5,
+        "Equation": 6,
+        "Text": 7,
+        "Figure": 8,
         "Reference": 9,
     }
 
