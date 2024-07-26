@@ -49,7 +49,7 @@ class Pdf(PdfParser):
         self._text_predict()
         callback(0.7, msg="Nougat predict finished")
 
-        tables = self._extract_table_figure(False, True)
+        tables = self._extract_table_figure(True)
         callback(0.9, msg="table figure process finished")
 
         results = sorted(
@@ -59,19 +59,17 @@ class Pdf(PdfParser):
         return results
 
 
-def parser(
+def parser_pdf(
     file_path, from_page, to_page, callback=None, postprocess=None, is_english=None
 ):
     pdf_parser = Pdf()
-    results = []
-    for page_i in range(from_page, to_page):
-        results += pdf_parser(
-            file_path,
-            from_page=page_i,
-            to_page=page_i + 1,
-            callback=callback,
-            is_english=is_english,
-        )
+    results = pdf_parser(
+        file_path,
+        from_page=from_page,
+        to_page=to_page,
+        callback=callback,
+        is_english=is_english,
+    )
     return postprocess(results, pdf_parser.page_images)
 
 
@@ -85,30 +83,65 @@ def get_document_total_pages(
 
 
 if __name__ == "__main__":
-    import sys
-    import json
-    from scripts import markdown
-    from scripts.rendering import pdf_rendering
-    from scripts.openai import openai
+    import argparse
+    from scripts.file_utils import init_file_path
+    from scripts.postprocess import PdfPostprocess, PdfMode, PdfObject
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--inputs",
+        help="Directory where to store PDFs, or a file path to a single PDF",
+        required=True,
+    )
+    parser.add_argument(
+        "--output_dir",
+        help="Directory where to store the output results (md/json/images).",
+        required=True,
+    )
+    parser.add_argument(
+        "--page_range",
+        help="The page range to parse the PDF, the format is 'start_page:end_page', that is, [start, end). Default: full.",
+        default="full",
+    )
+    parser.add_argument(
+        "--mode",
+        help="The mode for parsing the PDF, to extract only the plain text or the text plus images.",
+        choices=["plain", "figure"],
+        default="plain",
+    )
+    parser.add_argument(
+        "--rendering",
+        action='store_true',
+        help="Is it necessary to render the recognition results of the input PDF to output the recognition range? Default: False.",
+    )
+    parser.add_argument(
+        "--use_llm",
+        action='store_true',
+        help="Do you need to use LLM to format the parsing results? If so, please specify the corresponding parameters through the environment variables: DOC_PARSER_OPENAI_URL, DOC_PARSER_OPENAI_KEY, DOC_PARSER_OPENAI_MODEL. Default: False.",
+    )
+    args = parser.parse_args()
 
     def dummy(prog=None, msg=""):
-        # print('>>>>>', prog, msg, flush=True)
+        print(">>>>>>>>", prog, msg, flush=True)
         pass
 
-    def postprocess(results, page_images):
-        results = markdown.markdown_text(results)
-        # results = markdown.markdown_table(results)
-        page_images = pdf_rendering.pdf_rendering(
-            page_images,
-            results,
+    files = init_file_path(args.inputs)
+    for file in files:
+        post_process_obj = PdfPostprocess(
+            mode=PdfMode.PlainText if args.mode == "plain" else PdfMode.FigureText,
+            rendering=bool(args.rendering),
+            use_llm=bool(args.use_llm),
         )
-        page_images[0].save(
-            "/home/licheng/output.pdf", save_all=True, append_images=page_images[1:]
+        if ":" in args.page_range:
+            start_page, end_page = args.page_range.split(":")
+        else:
+            start_page = 0
+            end_page = get_document_total_pages(file)
+        pdf_object: PdfObject = parser_pdf(
+            file,
+            from_page=int(start_page),
+            to_page=int(end_page),
+            callback=dummy,
+            postprocess=post_process_obj.postprocess,
         )
-        text = '\n\n'.join([item['text'] for item in results if item["layout_type"] != "figure"])
-        text = openai.format_data(text)
-        open('/home/licheng/output.txt', 'w', encoding='utf-8').write(text)
-
-    res = parser(
-        sys.argv[1], from_page=3, to_page=4, callback=dummy, postprocess=postprocess
-    )
+        post_process_obj.save_data(pdf_object, file, args.output_dir)

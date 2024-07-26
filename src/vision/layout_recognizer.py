@@ -54,7 +54,7 @@ class LayoutRecognizer(Recognizer):
             )
             super().__init__(self.labels, self.labels_priority, domain, model_dir)
 
-        self.garbage_layouts = ["footer", "header", "equation"]
+        self.garbage_layouts = ["footer", "header", "equation", 'figure']
 
     def __call__(self, image_list, ocr_res, thr=0.2, batch_size=16, drop=True, update_pos=True):
         def __is_garbage(b):
@@ -116,8 +116,6 @@ class LayoutRecognizer(Recognizer):
                     ii = self.find_overlapped_with_threashold(bxs[i], lts_, thr=0.1)
                     if ii is None:
                         bxs.pop(i)
-                        # bxs[i]["layout_type"] = ""
-                        # i += 1
                         continue
 
                     lts_[ii]["visited"] = (
@@ -138,33 +136,45 @@ class LayoutRecognizer(Recognizer):
                         if lts_[ii]["type"] not in garbages:
                             garbages[lts_[ii]["type"]] = []
                         garbages[lts_[ii]["type"]].append(bxs[i]["text"])
+                        if lts_[ii]["type"] in ["figure", "equation"]:
+                            if 'text' not in lts_[ii]:
+                                 lts_[ii]['text'] = ""
+                            lts_[ii]['text'] += bxs[i]['text']
                         bxs.pop(i)
                         continue
-                    
+
                     bxs[i]["layoutno"] = f"{lts_[ii]['type']}-{ii}"
                     bxs[i]["layout_type"] = lts_[ii]["type"]
                     if update_pos:
-                        bxs[i]["x0"] = lts_[ii]["x0"]
-                        bxs[i]["x1"] = lts_[ii]["x1"]
-                        bxs[i]["top"] = lts_[ii]["top"]
-                        bxs[i]["bottom"] = lts_[ii]["bottom"]
+                        bxs[i]["x0"] = min(lts_[ii]["x0"], bxs[i]["x0"])
+                        bxs[i]["x1"] = max(lts_[ii]["x1"], bxs[i]["x1"])
+                        bxs[i]["top"] = min(lts_[ii]["top"], bxs[i]["top"])
+                        bxs[i]["bottom"] = max(lts_[ii]["bottom"], bxs[i]["bottom"])
                     i += 1
 
             findLayout()
 
-            # add box to figure layouts which has not text box
             for i, lt in enumerate(
                 [lt for lt in lts if lt["type"] in ["figure", "equation"]]
             ):
                 if lt.get("visited"):
                     continue
                 lt = deepcopy(lt)
-                lt["text"] = ""
+                lt["text"] = lt["text"] if 'text' in lt else ""
                 lt["layout_type"] = lt["type"]
                 lt["layoutno"] = f"{lt['type']}-{i}"
-                del lt["type"]
-                del lt["visited"]
-                del lt["score"]
+                try:
+                    del lt["type"]
+                except:
+                    pass
+                try:
+                    del lt["visited"]
+                except:
+                    pass
+                try:
+                    del lt["score"]
+                except:
+                    pass
                 bxs.append(lt)
 
             boxes.extend(bxs)

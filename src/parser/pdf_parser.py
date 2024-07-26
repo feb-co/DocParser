@@ -21,11 +21,12 @@ from src.vision import (
     TableStructureRecognizer,
 )
 
+from scripts.log_level import LOGING_MAP
 from scripts.file_utils import get_project_base_directory
 from scripts.nlp import rag_tokenizer
 
-
-logging.getLogger("pdfminer").setLevel(logging.WARNING)
+log_level = os.getenv('LOG_LEVEL', 'WARNING').upper()
+logging.getLogger().setLevel(LOGING_MAP[log_level])
 
 
 class PdfParser:
@@ -61,17 +62,6 @@ class PdfParser:
             )
 
         self.page_from = 0
-        """
-        If you have trouble downloading HuggingFace models, -_^ this might help!!
-
-        For Linux:
-        export HF_ENDPOINT=https://hf-mirror.com
-
-        For Windows:
-        Good luck
-        ^_-
-
-        """
 
     def __char_width(self, c):
         return (c["x1"] - c["x0"]) // max(len(c["text"]), 1)
@@ -696,7 +686,7 @@ class PdfParser:
             bxs_next["top"] = bxs_c["top"]
             self.boxes.pop(i)
 
-    def _extract_table_figure(self, need_image, return_html):
+    def _extract_table_figure(self, return_html):
         tables = {}
         figures = {}
         # extract figure and table boxes
@@ -728,7 +718,7 @@ class PdfParser:
                 lst_lout_no = lout_no
                 continue
 
-            if need_image and self.boxes[i]["layout_type"] == "figure":
+            if self.boxes[i]["layout_type"] == "figure":
                 if re.match(r"(数据|资料|图表)*来源[:： ]", self.boxes[i]["text"]):
                     self.boxes.pop(i)
                     continue
@@ -819,15 +809,6 @@ class PdfParser:
                     "x1": np.max([b["x1"] for b in bxs]),
                     "bottom": np.max([b["bottom"] for b in bxs]) - ht,
                 }
-                louts = [l for l in self.page_layout[pn - 1] if l["type"] == ltype]
-                ii = Recognizer.find_overlapped(b, louts, naive=True)
-                if ii is not None:
-                    b = louts[ii]
-                else:
-                    logging.warn(
-                        f"Missing layout match: {pn},%s" % (bxs[0].get("layoutno", ""))
-                    )
-
                 left, top, right, bott = b["x0"], b["top"], b["x1"], b["bottom"]
                 if right < left:
                     right = left + 1
@@ -858,6 +839,7 @@ class PdfParser:
             return pic
 
         # crop figure out and add caption
+        logging.debug("figure processing...")
         for k, bxs in figures.items():
             txt = "\n".join([b["text"] for b in bxs])
             if not txt:
@@ -880,7 +862,7 @@ class PdfParser:
             )
 
         # crop table out and add caption
-        logging.info("Table processing...")
+        logging.debug("Table processing...")
         def extract_table_from_img(img, start_x, start_y, page_number):
             bxs = self.ocr.detect(np.array(img))
             if not bxs:
@@ -1026,7 +1008,7 @@ class PdfParser:
         )
 
     def _text_predict(self,):
-        MARGIN_VALUE = 30
+        MARGIN_VALUE = 10
         for i in range(len(self.boxes)):
             if self.boxes[i]["layout_type"] in ("text", "equation", ""):
                 left, top, right, bott = (
@@ -1176,7 +1158,7 @@ class PdfParser:
         if not self.outlines:
             logging.warning(f"Miss outlines")
 
-        logging.info("Images converted.")
+        logging.debug("Images converted.")
 
         for i, img in enumerate(self.page_images):
             chars = []
@@ -1267,7 +1249,7 @@ class PdfParser:
         else:
             self.is_english = is_english
 
-        logging.info(f"Is it English: {self.is_english}")
+        logging.debug(f"Is it English: {self.is_english}")
 
         self.page_cum_height = np.cumsum(self.page_cum_height)
 

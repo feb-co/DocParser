@@ -205,3 +205,21 @@ def traversal_files(base):
         for f in fs:
             fullname = os.path.join(root, f)
             yield fullname
+
+
+def list_all_files(directory, files):
+    # 遍历目录
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            # 获取文件的完整路径
+            full_path = os.path.join(root, file)
+            files.append(full_path)
+
+
+def init_file_path(inputs):
+    if os.path.isdir(inputs):
+        files = []
+        list_all_files(inputs, files)
+    else:
+        files = [inputs]
+    return files

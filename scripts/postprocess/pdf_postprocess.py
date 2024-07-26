@@ -1,0 +1,128 @@
+import os
+import copy
+import json
+from enum import Enum
+from dataclasses import dataclass, field
+
+from scripts import markdown
+from scripts.rendering import pdf_rendering
+from scripts.openai import openai
+
+
+class PdfMode(Enum):
+    PlainText = "plain text"
+    FigureText = "figure text"
+
+
+@dataclass
+class PdfObject:
+    mode: PdfMode = None
+    texts: str = None
+    images: dict = field(default_factory=dict)
+    data_json: dict = field(default_factory=dict)
+    page_images: list = field(default_factory=list)
+
+
+class PdfPostprocess(object):
+    def __init__(
+        self,
+        mode: PdfMode,
+        rendering: bool = False,
+        use_llm: bool = False,
+    ) -> None:
+        self.mode = mode
+        self.rendering = rendering
+        self.use_llm = use_llm
+
+        self.__texts = None
+        self.__data_json = None
+        self.__images = {}
+        self.__page_images = None
+
+    def postprocess(self, results, page_images):
+        new_results = []
+        img_index = 0
+        for item in results:
+            if "figure" not in item["layout_type"]:
+                new_results.append(copy.deepcopy(item))
+            elif "figure" in item["layout_type"]:
+                new_item = copy.deepcopy(item)
+                new_item["text"] = f"[IMG-{img_index}]"
+                new_results.append(new_item)
+                img_index += 1
+                if self.mode == PdfMode.FigureText:
+                    image = new_item["image"]
+                    self.__images[new_item["text"]] = image
+
+        new_results = markdown.markdown_text(new_results)
+        self.__texts = "\n\n".join(
+            [
+                item["text"]
+                for item in new_results
+                if "figure" not in item["layout_type"]
+                or self.mode == PdfMode.FigureText
+            ]
+        )
+
+        for res in new_results:
+            if "image" in res:
+                del res["image"]
+        self.__data_json = [
+            item
+            for item in new_results
+            if "figure" not in item["layout_type"] or self.mode == PdfMode.FigureText
+        ]
+
+        if self.use_llm:
+            self.__texts = openai.format_data(self.__texts)
+
+        if self.rendering:
+            page_images = pdf_rendering.pdf_rendering(
+                page_images,
+                self.__data_json,
+            )
+        self.__page_images = page_images
+
+        return PdfObject(
+            mode=self.mode,
+            texts=self.__texts,
+            data_json=self.__data_json,
+            images=self.__images,
+            page_images=self.__page_images,
+        )
+
+    def save_data(self, pdf_object: PdfObject, input_file: str, output_dir: str):
+        base_name = os.path.basename(input_file)
+        file_title, _ = os.path.splitext(base_name)
+        if self.rendering or self.mode == PdfMode.FigureText:
+            full_dir_path = os.path.join(output_dir, file_title)
+            try:
+                os.makedirs(full_dir_path)
+            except:
+                pass
+            open(f"{full_dir_path}/{file_title}.md", "w", encoding="utf-8").write(
+                pdf_object.texts
+            )
+            if self.mode == PdfMode.FigureText:
+                img_dir_path = os.path.join(full_dir_path, "images")
+                try:
+                    os.makedirs(img_dir_path)
+                except:
+                    pass
+                for image_id in pdf_object.images:
+                    image_file = f"{img_dir_path}/{image_id}.png"
+                    pdf_object.images[image_id].save(image_file)
+            if self.rendering:
+                with open(
+                    f"{full_dir_path}/{file_title}.json", "w", encoding="utf-8"
+                ) as fo:
+                    json.dump(pdf_object.data_json, fo, ensure_ascii=False, indent=2)
+                pdf_object.page_images[0].save(
+                    f"{full_dir_path}/{file_title}_rendering.pdf",
+                    save_all=True,
+                    append_images=pdf_object.page_images[1:],
+                )
+        else:
+            open(f"{output_dir}/{file_title}.md", "w", encoding="utf-8").write(
+                pdf_object.texts
+            )
