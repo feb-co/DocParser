@@ -72,11 +72,11 @@ class LayoutRecognizer(Recognizer):
             return any([re.search(p, b["text"]) for p in patt])
 
         layouts = super().__call__(image_list, thr, batch_size)
-        # save_results(image_list, layouts, self.labels, output_dir='output/', threshold=0.7)
+
         assert len(image_list) == len(ocr_res)
-        # Tag layout type
-        boxes = []
         assert len(image_list) == len(layouts)
+
+        boxes = []
         garbages = {}
         page_layout = []
         for pn, lts in enumerate(layouts):

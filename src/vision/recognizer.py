@@ -1,4 +1,5 @@
 import os
+import torch
 from copy import deepcopy
 import onnxruntime as ort
 from huggingface_hub import snapshot_download
@@ -69,7 +70,7 @@ class Recognizer(object):
 
         if not os.path.exists(model_file_path):
             raise ValueError("not find model file path {}".format(model_file_path))
-        if False and ort.get_device() == "GPU":
+        if torch.cuda.is_available() and ort.get_device() == "GPU":
             options = ort.SessionOptions()
             options.enable_cpu_mem_arena = False
             self.ort_sess = ort.InferenceSession(

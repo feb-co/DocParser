@@ -11,7 +11,8 @@ from scripts.openai import openai
 
 class PdfMode(Enum):
     PlainText = "plain text"
-    FigureText = "figure text"
+    FigurePlacehold = "figure placehold"
+    FigureLatex = "figure latex"
 
 
 @dataclass
@@ -50,7 +51,7 @@ class PdfPostprocess(object):
                 new_item["text"] = f"[IMG-{img_index}]"
                 new_results.append(new_item)
                 img_index += 1
-                if self.mode == PdfMode.FigureText:
+                if self.mode in (PdfMode.FigurePlacehold, PdfMode.FigureLatex):
                     image = new_item["image"]
                     self.__images[new_item["text"]] = image
 
@@ -60,7 +61,7 @@ class PdfPostprocess(object):
                 item["text"]
                 for item in new_results
                 if "figure" not in item["layout_type"]
-                or self.mode == PdfMode.FigureText
+                or self.mode in (PdfMode.FigurePlacehold, PdfMode.FigureLatex)
             ]
         )
 
@@ -70,7 +71,8 @@ class PdfPostprocess(object):
         self.__data_json = [
             item
             for item in new_results
-            if "figure" not in item["layout_type"] or self.mode == PdfMode.FigureText
+            if "figure" not in item["layout_type"]
+            or self.mode in (PdfMode.FigurePlacehold, PdfMode.FigureLatex)
         ]
 
         if self.use_llm:
@@ -94,16 +96,17 @@ class PdfPostprocess(object):
     def save_data(self, pdf_object: PdfObject, input_file: str, output_dir: str):
         base_name = os.path.basename(input_file)
         file_title, _ = os.path.splitext(base_name)
-        if self.rendering or self.mode == PdfMode.FigureText:
+        if self.rendering or self.mode in (
+            PdfMode.FigurePlacehold,
+            PdfMode.FigureLatex,
+        ):
             full_dir_path = os.path.join(output_dir, file_title)
             try:
                 os.makedirs(full_dir_path)
             except:
                 pass
-            open(f"{full_dir_path}/{file_title}.md", "w", encoding="utf-8").write(
-                pdf_object.texts
-            )
-            if self.mode == PdfMode.FigureText:
+
+            if self.mode in (PdfMode.FigurePlacehold, PdfMode.FigureLatex):
                 img_dir_path = os.path.join(full_dir_path, "images")
                 try:
                     os.makedirs(img_dir_path)
@@ -112,6 +115,15 @@ class PdfPostprocess(object):
                 for image_id in pdf_object.images:
                     image_file = f"{img_dir_path}/{image_id}.png"
                     pdf_object.images[image_id].save(image_file)
+                    if self.mode in (PdfMode.FigureLatex,):
+                        pdf_object.texts = pdf_object.texts.replace(
+                            image_id, f"!{image_id}({image_file})"
+                        )
+
+            open(f"{full_dir_path}/{file_title}.md", "w", encoding="utf-8").write(
+                pdf_object.texts
+            )
+
             if self.rendering:
                 with open(
                     f"{full_dir_path}/{file_title}.json", "w", encoding="utf-8"

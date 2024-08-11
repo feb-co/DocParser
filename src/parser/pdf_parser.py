@@ -1,6 +1,7 @@
 import os
 import re
 import torch
+from tqdm import tqdm
 
 import xgboost as xgb
 from io import BytesIO
@@ -25,7 +26,7 @@ from scripts.log_level import LOGING_MAP
 from scripts.file_utils import get_project_base_directory
 from scripts.nlp import rag_tokenizer
 
-log_level = os.getenv('LOG_LEVEL', 'WARNING').upper()
+log_level = os.getenv("LOG_LEVEL", "WARNING").upper()
 logging.getLogger().setLevel(LOGING_MAP[log_level])
 
 
@@ -234,7 +235,7 @@ class PdfParser:
                 b["H_left"] = spans[ii]["x0"]
                 b["H_right"] = spans[ii]["x1"]
                 b["SP"] = ii
-        
+
         return table_bxs
 
     def __ocr(self, pagenum, img, chars, ZM=3):
@@ -311,172 +312,191 @@ class PdfParser:
             self.page_images, self.boxes, drop=drop
         )
 
-        # cumlative Y
-        for i in range(len(self.boxes)):
-            self.boxes[i]["top"] += self.page_cum_height[
-                self.boxes[i]["page_number"] - 1
-            ]
-            self.boxes[i]["bottom"] += self.page_cum_height[
-                self.boxes[i]["page_number"] - 1
-            ]
-
     def _text_merge(self):
         # merge adjusted boxes
-        bxs = self.boxes
+        bxs_per_page = {}
+        for box in self.boxes:
+            if box["page_number"] not in bxs_per_page:
+                bxs_per_page[box["page_number"]] = []
+            bxs_per_page[box["page_number"]].append(box)
 
         # horizontally merge adjacent box with the same layout
-        i = 0
-        while i < len(bxs) - 1:
-            bxs_c = bxs[i]
-            bxs_next = bxs[i + 1]
+        boxes = []
+        for pn in bxs_per_page:
+            bxs = bxs_per_page[pn]
+            i = 0
+            while i < len(bxs) - 1:
+                bxs_c = bxs[i]
+                bxs_next = bxs[i + 1]
 
-            if bxs_c.get("layoutno", "0") != bxs_next.get("layoutno", "1") or bxs_c.get(
-                "layout_type", ""
-            ) in ["table", "figure", "equation"]:
+                if bxs_c.get("layoutno", "0") != bxs_next.get(
+                    "layoutno", "1"
+                ) or bxs_c.get("layout_type", "") in ["table", "figure", "equation"]:
+                    i += 1
+                    continue
+
+                if (
+                    abs(self._y_dis(bxs_c, bxs_next))
+                    < self.mean_height[bxs[i]["page_number"] - 1] / 3
+                ):
+                    # merge
+                    # bxs[i]["x1"] = bxs_next["x1"]
+                    # bxs[i]["top"] = (bxs_c["top"] + bxs_next["top"]) / 2
+                    # bxs[i]["bottom"] = (bxs_c["bottom"] + bxs_next["bottom"]) / 2
+                    
+                    bxs[i]["x0"] = min(bxs_c["x0"], bxs_next["x0"])
+                    bxs[i]["x1"] = max(bxs_c["x1"], bxs_next["x1"])
+                    bxs[i]["top"] = min(bxs_c["top"], bxs_next["top"])
+                    bxs[i]["bottom"] = max(bxs_c["bottom"], bxs_next["bottom"])
+                    bxs[i]["text"] += bxs_next["text"]
+                    bxs.pop(i + 1)
+                    continue
+
                 i += 1
                 continue
 
-            if (
-                abs(self._y_dis(bxs_c, bxs_next))
-                < self.mean_height[bxs[i]["page_number"] - 1] / 3
-            ):
-                # merge
-                bxs[i]["x1"] = bxs_next["x1"]
-                bxs[i]["top"] = (bxs_c["top"] + bxs_next["top"]) / 2
-                bxs[i]["bottom"] = (bxs_c["bottom"] + bxs_next["bottom"]) / 2
-                bxs[i]["text"] += bxs_next["text"]
-                bxs.pop(i + 1)
-                continue
+            boxes += bxs
 
-            i += 1
-            continue
-
-        self.boxes = bxs
+        self.boxes = boxes
 
     def _naive_vertical_merge(self):
-        # count boxes in the same row as a feature
-        for i in range(len(self.boxes)):
-            mh = self.mean_height[self.boxes[i]["page_number"] - 1]
-            self.boxes[i]["in_row"] = 0
-            j = max(0, i - 12)
-            while j < min(i + 12, len(self.boxes)):
-                if j == i:
+        bxs_per_page = {}
+        for box in self.boxes:
+            if box["page_number"] not in bxs_per_page:
+                bxs_per_page[box["page_number"]] = []
+            bxs_per_page[box["page_number"]].append(box)
+
+        boxes = []
+        for pn in bxs_per_page:
+            bxs = bxs_per_page[pn]
+
+            # count boxes in the same row as a feature
+            for i in range(len(bxs)):
+                mh = self.mean_height[bxs[i]["page_number"] - 1]
+                bxs[i]["in_row"] = 0
+                j = max(0, i - 12)
+                while j < min(i + 12, len(bxs)):
+                    if j == i:
+                        j += 1
+                        continue
+                    ydis = self._y_dis(bxs[i], bxs[j]) / mh
+                    if abs(ydis) < 1:
+                        bxs[i]["in_row"] += 1
+                    elif ydis > 0:
+                        break
                     j += 1
+
+            bxs = Recognizer.sort_Y_firstly(bxs, np.median(self.mean_height) / 3)
+            i = 0
+            while i + 1 < len(bxs):
+                bxs_c = bxs[i]
+                bxs_next = bxs[i + 1]
+
+                # is invalid character
+                if bxs_c["page_number"] < bxs_next["page_number"] and re.match(
+                    r"[0-9  •一—-]+$", bxs_next["text"]
+                ):
+                    bxs.pop(i)
                     continue
-                ydis = self._y_dis(self.boxes[i], self.boxes[j]) / mh
-                if abs(ydis) < 1:
-                    self.boxes[i]["in_row"] += 1
-                elif ydis > 0:
-                    break
-                j += 1
 
-        bxs = Recognizer.sort_Y_firstly(self.boxes, np.median(self.mean_height) / 3)
-        i = 0
+                if not bxs_c["text"].strip() and bxs_c["layout_type"] in ("text"):
+                    bxs.pop(i)
+                    continue
 
-        while i + 1 < len(bxs):
-            bxs_c = bxs[i]
-            bxs_next = bxs[i + 1]
-
-            # is invalid character
-            if bxs_c["page_number"] < bxs_next["page_number"] and re.match(
-                r"[0-9  •一—-]+$", bxs_next["text"]
-            ):
-                bxs.pop(i)
-                continue
-
-            if not bxs_c["text"].strip() and bxs_c["layout_type"] in ("text"):
-                bxs.pop(i)
-                continue
-
-            if (
-                "layout_type" in bxs_c
-                and (
-                    bxs_c["layout_type"] == "figure caption"
-                    or bxs_c["layout_type"] == ""
-                )
-                and "layout_type" in bxs_next
-                and (
-                    bxs_next["layout_type"] == "figure caption"
-                    or bxs_next["layout_type"] == ""
-                )
-            ):
                 if (
-                    ("," in bxs_c["text"] or "，" in bxs_c["text"])
-                    and abs(bxs_c["bottom"] - bxs_next["bottom"]) > 1
-                    and abs(bxs_c["x0"] - bxs_next["x0"]) > 1.5
+                    "layout_type" in bxs_c
+                    and (
+                        bxs_c["layout_type"] == "figure caption"
+                        or bxs_c["layout_type"] == ""
+                    )
+                    and "layout_type" in bxs_next
+                    and (
+                        bxs_next["layout_type"] == "figure caption"
+                        or bxs_next["layout_type"] == ""
+                    )
+                ):
+                    if (
+                        ("," in bxs_c["text"] or "，" in bxs_c["text"])
+                        and abs(bxs_c["bottom"] - bxs_next["bottom"]) > 1
+                        and abs(bxs_c["x0"] - bxs_next["x0"]) > 1.5
+                    ):
+                        bxs_c["layout_type"] = "text"
+
+                if (
+                    "layout_type" in bxs_c
+                    and bxs_c["layout_type"] == "figure"
+                    and "layout_type" in bxs_next
+                    and bxs_next["layout_type"] == "figure caption"
+                ):
+                    if ("," in bxs_next["text"] or "，" in bxs_next["text"]) and (
+                        ". " in bxs_next["text"] or "。" in bxs_next["text"]
+                    ):
+                        bxs_next["layout_type"] = "text"
+
+                if (
+                    i - 1 >= 0
+                    and "layout_type" in bxs[i - 1]
+                    and bxs[i - 1]["layout_type"] in ("figure caption", "text")
+                    and "layout_type" in bxs_c
+                    and bxs_c["layout_type"] == "figure caption"
+                    and "layout_type" in bxs_next
+                    and bxs_next["layout_type"] == "table caption"
                 ):
                     bxs_c["layout_type"] = "text"
 
-            if (
-                "layout_type" in bxs_c
-                and bxs_c["layout_type"] == "figure"
-                and "layout_type" in bxs_next
-                and bxs_next["layout_type"] == "figure caption"
-            ):
-                if ("," in bxs_next["text"] or "，" in bxs_next["text"]) and (
-                    ". " in bxs_next["text"] or "。" in bxs_next["text"]
-                ):
-                    bxs_next["layout_type"] = "text"
+                # features for concating
+                try:
+                    concat_features = self._updown_concat_features(bxs_c, bxs_next)
+                except:
+                    i += 1
+                    continue
+                is_concatting = (
+                    self.updown_cnt_mdl.predict(xgb.DMatrix([concat_features]))[0] > 0.5
+                )
 
-            if (
-                i - 1 >= 0
-                and "layout_type" in bxs[i - 1]
-                and bxs[i - 1]["layout_type"] in ("figure caption", "text")
-                and "layout_type" in bxs_c
-                and bxs_c["layout_type"] == "figure caption"
-                and "layout_type" in bxs_next
-                and bxs_next["layout_type"] == "table caption"
-            ):
-                bxs_c["layout_type"] = "text"
+                # features for not concating
+                is_same_witdth = (
+                    abs(bxs_c["x0"] - bxs_next["x0"]) < 1.0
+                    and abs(bxs_c["x1"] - bxs_next["x1"]) < 1.0
+                )
+                is_not_concatting = [
+                    (
+                        "layoutno" in bxs_c
+                        and "layoutno" in bxs_next
+                        and bxs_c.get("layoutno", 0) != bxs_next.get("layoutno", 0)
+                    ),
+                    bxs_c["text"].strip()[-1] in "。？！?" and not is_same_witdth,
+                    self.is_english
+                    and bxs_c["text"].strip()[-1] in ".!?"
+                    and not is_same_witdth,
+                    bxs_c["page_number"] == bxs_next["page_number"]
+                    and bxs_next["top"] - bxs_c["bottom"]
+                    > self.mean_height[bxs_next["page_number"] - 1] * 1.5,
+                    bxs_c["page_number"] < bxs_next["page_number"]
+                    and abs(bxs_c["x0"] - bxs_next["x0"])
+                    > self.mean_width[bxs_c["page_number"] - 1] * 4,
+                ]
 
-            # features for concating
-            try:
-                concat_features = self._updown_concat_features(bxs_c, bxs_next)
-            except:
-                i += 1
-                continue
-            is_concatting = (
-                self.updown_cnt_mdl.predict(xgb.DMatrix([concat_features]))[0] > 0.5
-            )
+                # split features
+                detach_feats = [
+                    bxs_c["x1"] < bxs_next["x0"],
+                    bxs_c["x0"] > bxs_next["x1"],
+                ]
 
-            # features for not concating
-            is_same_witdth = (
-                abs(bxs_c["x0"] - bxs_next["x0"]) < 1.0
-                and abs(bxs_c["x1"] - bxs_next["x1"]) < 1.0
-            )
-            is_not_concatting = [
-                (
-                    "layoutno" in bxs_c
-                    and "layoutno" in bxs_next
-                    and bxs_c.get("layoutno", 0) != bxs_next.get("layoutno", 0)
-                ),
-                bxs_c["text"].strip()[-1] in "。？！?" and not is_same_witdth,
-                self.is_english
-                and bxs_c["text"].strip()[-1] in ".!?"
-                and not is_same_witdth,
-                bxs_c["page_number"] == bxs_next["page_number"]
-                and bxs_next["top"] - bxs_c["bottom"]
-                > self.mean_height[bxs_next["page_number"] - 1] * 1.5,
-                bxs_c["page_number"] < bxs_next["page_number"]
-                and abs(bxs_c["x0"] - bxs_next["x0"])
-                > self.mean_width[bxs_c["page_number"] - 1] * 4,
-            ]
+                if (any(is_not_concatting) and not is_concatting) or any(detach_feats):
+                    i += 1
+                    continue
 
-            # split features
-            detach_feats = [bxs_c["x1"] < bxs_next["x0"], bxs_c["x0"] > bxs_next["x1"]]
+                # merge up and down
+                bxs_c["bottom"] = bxs_next["bottom"]
+                bxs_c["text"] = bxs_c["text"] + " " + bxs_next["text"]
+                bxs_c["x0"] = min(bxs_c["x0"], bxs_next["x0"])
+                bxs_c["x1"] = max(bxs_c["x1"], bxs_next["x1"])
+                bxs.pop(i + 1)
 
-            if (any(is_not_concatting) and not is_concatting) or any(detach_feats):
-                i += 1
-                continue
+            boxes += bxs
 
-            # merge up and down
-            bxs_c["bottom"] = bxs_next["bottom"]
-            bxs_c["text"] = bxs_c["text"] + " " + bxs_next["text"]
-            bxs_c["x0"] = min(bxs_c["x0"], bxs_next["x0"])
-            bxs_c["x1"] = max(bxs_c["x1"], bxs_next["x1"])
-            bxs.pop(i + 1)
-
-        self.boxes = bxs
+        self.boxes = boxes
 
     def _concat_downward(self, concat_between_pages=True):
         # count boxes in the same row as a feature
@@ -689,6 +709,7 @@ class PdfParser:
     def _extract_table_figure(self, return_html):
         tables = {}
         figures = {}
+
         # extract figure and table boxes
         i = 0
         lst_lout_no = ""
@@ -760,23 +781,28 @@ class PdfParser:
         # find captions and pop out
         i = 0
         while i < len(self.boxes):
-            c = self.boxes[i]
+            c_box = self.boxes[i]
             # mh = self.mean_height[c["page_number"]-1]
-            if not TableStructureRecognizer.is_caption(c):
+            if not TableStructureRecognizer.is_caption(c_box):
                 i += 1
                 continue
 
             # find the nearest layouts
             def nearest(tbls):
-                nonlocal c
+                nonlocal c_box
                 mink = ""
                 minv = 1000000000
                 for k, bxs in tbls.items():
                     for b in bxs:
-                        if b.get("layout_type", "").find("caption") >= 0:
+                        if (
+                            b.get("layout_type", "").find("caption") >= 0
+                            or b["page_number"] != c_box["page_number"]
+                        ):
                             continue
-                        y_dis = self._y_dis(c, b)
-                        x_dis = self._x_dis(c, b) if not x_overlapped(c, b) else 0
+                        y_dis = self._y_dis(c_box, b)
+                        x_dis = (
+                            self._x_dis(c_box, b) if not x_overlapped(c_box, b) else 0
+                        )
                         dis = y_dis * y_dis + x_dis * x_dis
                         if dis < minv:
                             mink = k
@@ -789,10 +815,10 @@ class PdfParser:
             #    i += 1
             #    continue
             if tv < fv and tk:
-                tables[tk].insert(0, c)
+                tables[tk].insert(0, c_box)
                 logging.debug("TABLE:" + self.boxes[i]["text"] + "; Cap: " + tk)
             elif fk:
-                figures[fk].insert(0, c)
+                figures[fk].insert(0, c_box)
                 logging.debug("FIGURE:" + self.boxes[i]["text"] + "; Cap: " + tk)
             self.boxes.pop(i)
 
@@ -802,12 +828,11 @@ class PdfParser:
             pn = set([b["page_number"] for b in bxs])
             if len(pn) < 2:
                 pn = list(pn)[0]
-                ht = self.page_cum_height[pn - 1]
                 b = {
                     "x0": np.min([b["x0"] for b in bxs]),
-                    "top": np.min([b["top"] for b in bxs]) - ht,
+                    "top": np.min([b["top"] for b in bxs]),
                     "x1": np.max([b["x1"] for b in bxs]),
-                    "bottom": np.max([b["bottom"] for b in bxs]) - ht,
+                    "bottom": np.max([b["bottom"] for b in bxs]),
                 }
                 left, top, right, bott = b["x0"], b["top"], b["x1"], b["bottom"]
                 if right < left:
@@ -854,7 +879,7 @@ class PdfParser:
                     "top": poss[0][3],
                     "bottom": poss[0][4],
                     "text": txt,
-                    "page_number": poss[0][0],
+                    "page_number": int(k.split("-")[0]),
                     "layout_type": "figure",
                     "layoutno": k,
                     "image": crop_image,
@@ -863,6 +888,7 @@ class PdfParser:
 
         # crop table out and add caption
         logging.debug("Table processing...")
+
         def extract_table_from_img(img, start_x, start_y, page_number):
             bxs = self.ocr.detect(np.array(img))
             if not bxs:
@@ -903,23 +929,21 @@ class PdfParser:
                 )
                 del b["txt"]
 
-            bxs, _ = self.layouter(
-                [img], [bxs], drop=True, update_pos=False
-            )
+            bxs, _ = self.layouter([img], [bxs], drop=True, update_pos=False)
             bxs = [b for b in bxs if b["text"]]
             for b in bxs:
                 b["x0"] += start_x
                 b["x1"] += start_x
                 b["top"] += start_y
                 b["bottom"] += start_y
-                if b['layout_type'] == 'figure':
-                    b['layout_type'] = 'table'
-                elif 'caption' in b['layout_type']:
-                    b['layout_type'] = 'table caption'
+                if b["layout_type"] == "figure":
+                    b["layout_type"] = "table"
+                elif "caption" in b["layout_type"]:
+                    b["layout_type"] = "table caption"
                 else:
-                    b['layout_type'] = 'table'
+                    b["layout_type"] = "table"
 
-                del b['layoutno']
+                del b["layoutno"]
 
             # table layout
             table_layout = self.tbl_det([img])[0]
@@ -952,15 +976,15 @@ class PdfParser:
                                 crop_image,
                                 start_x=poss[0][1],
                                 start_y=poss[0][3],
-                                page_number=poss[0][0],
+                                page_number=int(k.split("-")[0]),
                             )
                         ),
                         html=return_html,
                         is_english=self.is_english,
                     ),
-                    "page_number": poss[0][0],
+                    "page_number": int(k.split("-")[0]),
                     "layout_type": "table",
-                    "layoutno": k
+                    "layoutno": k,
                 }
             )
 
@@ -992,8 +1016,8 @@ class PdfParser:
 
     def _line_tag(self, bx, zoomin):
         pn = [bx["page_number"]]
-        top = bx["top"] - self.page_cum_height[pn[0] - 1]
-        bott = bx["bottom"] - self.page_cum_height[pn[0] - 1]
+        top = bx["top"]
+        bott = bx["bottom"]
         page_images_cnt = len(self.page_images)
         if pn[-1] - 1 >= page_images_cnt:
             return ""
@@ -1007,7 +1031,11 @@ class PdfParser:
             "-".join([str(p) for p in pn]), bx["x0"], bx["x1"], top, bott
         )
 
-    def _text_predict(self,):
+    def _text_predict(
+        self,
+    ):
+        index_list = []
+        image_list = []
         MARGIN_VALUE = 10
         for i in range(len(self.boxes)):
             if self.boxes[i]["layout_type"] in ("text", "equation", ""):
@@ -1022,9 +1050,13 @@ class PdfParser:
                 image = self.page_images[self.boxes[i]["page_number"] - 1].crop(
                     (left, top, right, bott)
                 )
-                text = self.nougat(image)
-                if len(text) > 0 and "[MISSING_PAGE_POST]" not in text:
-                    self.boxes[i]["text"] = text
+                index_list.append(i)
+                image_list.append(image)
+
+        text_list = self.nougat(image_list)
+        for i, text in enumerate(text_list):
+            if len(text) > 0 and "[MISSING_PAGE_POST]" not in text:
+                self.boxes[index_list[i]]["text"] = text
 
     def __filterout_scraps(self, boxes, ZM):
 
@@ -1119,7 +1151,6 @@ class PdfParser:
         self.mean_width = []
         self.boxes = []
         self.garbages = {}
-        self.page_cum_height = [0]
         self.page_layout = []
         self.page_from = page_from
         try:
@@ -1160,7 +1191,7 @@ class PdfParser:
 
         logging.debug("Images converted.")
 
-        for i, img in enumerate(self.page_images):
+        for i, img in enumerate(tqdm(self.page_images)):
             chars = []
             self.mean_height.append(
                 np.median(sorted([c["height"] for c in chars])) if chars else 0
@@ -1168,7 +1199,6 @@ class PdfParser:
             self.mean_width.append(
                 np.median(sorted([c["width"] for c in chars])) if chars else 8
             )
-            self.page_cum_height.append(img.size[1] / zoomin)
             j = 0
             while j + 1 < len(chars):
                 if (
@@ -1186,7 +1216,6 @@ class PdfParser:
             self.__ocr(i + 1, img, chars, zoomin)
             if callback and i % 6 == 5:
                 callback(prog=(i + 1) * 0.6 / len(self.page_images), msg="")
-            self.boxes
 
         if is_english is None:
             self.is_english = [
@@ -1209,7 +1238,6 @@ class PdfParser:
                 self.boxes = []
                 self.mean_height = []
                 self.mean_width = []
-                self.page_cum_height = [0]
                 for i, img in enumerate(self.page_images):
                     chars = self.page_chars[i]
                     self.mean_height.append(
@@ -1218,7 +1246,6 @@ class PdfParser:
                     self.mean_width.append(
                         np.median(sorted([c["width"] for c in chars])) if chars else 8
                     )
-                    self.page_cum_height.append(img.size[1] / zoomin)
                     j = 0
                     while j + 1 < len(chars):
                         if (
@@ -1251,9 +1278,6 @@ class PdfParser:
 
         logging.debug(f"Is it English: {self.is_english}")
 
-        self.page_cum_height = np.cumsum(self.page_cum_height)
-
-        assert len(self.page_cum_height) == len(self.page_images) + 1
         if len(self.boxes) == 0 and zoomin < 9:
             self.__images__(fnm, zoomin * 3, page_from, page_to, callback)
 

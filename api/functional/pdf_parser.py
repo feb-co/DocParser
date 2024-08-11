@@ -54,8 +54,9 @@ class Pdf(PdfParser):
 
         results = sorted(
             [bxs for bxs in self.boxes + tables],
-            key=lambda x: (x["top"], x["x0"]),
+            key=lambda x: (x["page_number"], x["top"], x["x0"]),
         )
+
         return results
 
 
@@ -106,17 +107,17 @@ if __name__ == "__main__":
     parser.add_argument(
         "--mode",
         help="The mode for parsing the PDF, to extract only the plain text or the text plus images.",
-        choices=["plain", "figure"],
+        choices=["plain", "figure placehold", "figure latex"],
         default="plain",
     )
     parser.add_argument(
         "--rendering",
-        action='store_true',
+        action="store_true",
         help="Is it necessary to render the recognition results of the input PDF to output the recognition range? Default: False.",
     )
     parser.add_argument(
         "--use_llm",
-        action='store_true',
+        action="store_true",
         help="Do you need to use LLM to format the parsing results? If so, please specify the corresponding parameters through the environment variables: DOC_PARSER_OPENAI_URL, DOC_PARSER_OPENAI_KEY, DOC_PARSER_OPENAI_MODEL. Default: False.",
     )
     args = parser.parse_args()
@@ -126,9 +127,18 @@ if __name__ == "__main__":
         pass
 
     files = init_file_path(args.inputs)
+    if args.mode == "plain":
+        mode = PdfMode.PlainText
+    elif args.mode == "figure placehold":
+        mode = PdfMode.FigurePlacehold
+    elif args.mode == "figure latex":
+        mode = PdfMode.FigureLatex
+    else:
+        raise NotImplementedError
+        
     for file in files:
         post_process_obj = PdfPostprocess(
-            mode=PdfMode.PlainText if args.mode == "plain" else PdfMode.FigureText,
+            mode=mode,
             rendering=bool(args.rendering),
             use_llm=bool(args.use_llm),
         )

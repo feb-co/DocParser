@@ -2,6 +2,7 @@ import os
 import time
 import requests
 
+from scripts.nlp.split_text import split_text_by_words_num
 from scripts.openai.prompts import PROMPT_FORMAT, PROMPT_FORMAT_HIS
 
 
@@ -22,13 +23,7 @@ def get_response(payload):
             idx += 1
 
 
-def format_data(text: str, history_text: list = []):
-    if len(history_text) > 0:
-        history_text_str = "\n\n".join(history_text)
-        prompt = PROMPT_FORMAT_HIS.format(last_data=history_text_str, data=text)
-    else:
-        prompt = PROMPT_FORMAT.format(data=text)
-
+def get_format_data(prompt):
     payload = {
         "model": os.environ.get("DOC_PARSER_OPENAI_MODEL"),
         "temperature": 0.01,
@@ -58,5 +53,24 @@ def format_data(text: str, history_text: list = []):
             .strip(" ")
         )
         return corrected_data
+    else:
+        return None
 
+
+def format_data(text: str):
+    split_texts: list = split_text_by_words_num(text)
+    new_split_text = []
+    for idx, sub_text in enumerate(split_texts):
+        if idx == 0:
+            prompt = PROMPT_FORMAT.format(data=sub_text)
+        else:
+            history_text_str = "\n\n".join(new_split_text[max(0, idx-2):])
+            prompt = PROMPT_FORMAT_HIS.format(last_data=history_text_str, data=text)
+        
+        new_sub_text = get_format_data(prompt)
+        if new_sub_text:
+            new_split_text.append(new_sub_text)
+        else:
+            new_split_text.append(sub_text)
+    text = ' '.join(new_split_text)
     return text

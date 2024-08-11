@@ -1,6 +1,7 @@
 import copy
 import time
 import os
+import torch
 import numpy as np
 import onnxruntime as ort
 
@@ -62,7 +63,7 @@ def load_model(model_dir, nm):
     options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
     options.intra_op_num_threads = 2
     options.inter_op_num_threads = 2
-    if False and ort.get_device() == "GPU":
+    if torch.cuda.is_available() and ort.get_device() == "GPU":
         sess = ort.InferenceSession(
             model_file_path,
             options=options,
@@ -336,7 +337,7 @@ class TextRecognizer(object):
                 except Exception as e:
                     if i >= 3:
                         raise e
-                    time.sleep(5)
+                    time.sleep(3)
             preds = outputs[0]
             rec_result = self.postprocess_op(preds)
             for rno in range(len(rec_result)):
@@ -448,7 +449,7 @@ class TextDetector(object):
             except Exception as e:
                 if i >= 3:
                     raise e
-                time.sleep(5)
+                time.sleep(3)
 
         post_result = self.postprocess_op({"maps": outputs[0]}, shape_list)
         dt_boxes = post_result[0]['points']
