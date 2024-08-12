@@ -1,6 +1,8 @@
 import os
 import sys
 
+os.environ["NO_ALBUMENTATIONS_UPDATE"] = "1"
+
 work_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(work_dir)
 
