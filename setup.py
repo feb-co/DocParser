@@ -3,13 +3,15 @@ import re
 
 from setuptools import find_packages, setup
 
+ROOT = os.path.abspath(os.path.dirname(__file__))
 
-def get_version():
-    with open(os.path.join("src", "extras", "env.py"), "r", encoding="utf-8") as f:
-        file_content = f.read()
-        pattern = r"{}\W*=\W*\"([^\"]+)\"".format("VERSION")
-        (version,) = re.findall(pattern, file_content)
-        return version
+
+def read_version():
+    data = {}
+    path = os.path.join("_version.py")
+    with open(path, "r", encoding="utf-8") as f:
+        exec(f.read(), data)
+    return data["__version__"]
 
 
 def get_requires():
@@ -23,7 +25,7 @@ def get_requires():
 def main():
     setup(
         name="doc_parser",
-        version=get_version(),
+        version=read_version(),
         author="Licheng Wang",
         author_email="244267620@qq.com",
         description="Document parsing tool for LLM training and Rag",
