@@ -888,7 +888,6 @@ class PdfParser:
 
         # crop table out and add caption
         logging.debug("Table processing...")
-
         def extract_table_from_img(img, start_x, start_y, page_number):
             bxs = self.ocr.detect(np.array(img))
             if not bxs:
@@ -946,7 +945,17 @@ class PdfParser:
                 del b["layoutno"]
 
             # table layout
-            table_layout = self.tbl_det([img])[0]
+            table_layout = []
+            retry = 0
+            while True:
+                try:
+                   table_layout = self.tbl_det([img])[0]
+                   break
+                except:
+                    if retry>3:
+                        break
+                    retry += 1
+                    pass
             for item in table_layout:
                 item["x0"] += start_x
                 item["x1"] += start_x
