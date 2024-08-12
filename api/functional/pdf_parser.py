@@ -27,7 +27,6 @@ class Pdf(PdfParser):
             zoomin,
             from_page,
             to_page,
-            callback,
             is_english=is_english,
         )
         callback(0.3, msg="OCR detect finished")
