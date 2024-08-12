@@ -973,29 +973,32 @@ class PdfParser:
             )
             poss = []
             crop_image = cropout(bxs, "table", poss)
-            res.append(
-                {
-                    "x0": poss[0][1],
-                    "x1": poss[0][2],
-                    "top": poss[0][3],
-                    "bottom": poss[0][4],
-                    "text": self.tbl_det.construct_table(
-                        self.__table_transformer_job(
-                            *extract_table_from_img(
-                                crop_image,
-                                start_x=poss[0][1],
-                                start_y=poss[0][3],
-                                page_number=int(k.split("-")[0]),
-                            )
+            try:
+                res.append(
+                    {
+                        "x0": poss[0][1],
+                        "x1": poss[0][2],
+                        "top": poss[0][3],
+                        "bottom": poss[0][4],
+                        "text": self.tbl_det.construct_table(
+                            self.__table_transformer_job(
+                                *extract_table_from_img(
+                                    crop_image,
+                                    start_x=poss[0][1],
+                                    start_y=poss[0][3],
+                                    page_number=int(k.split("-")[0]),
+                                )
+                            ),
+                            html=return_html,
+                            is_english=self.is_english,
                         ),
-                        html=return_html,
-                        is_english=self.is_english,
-                    ),
-                    "page_number": int(k.split("-")[0]),
-                    "layout_type": "table",
-                    "layoutno": k,
-                }
-            )
+                        "page_number": int(k.split("-")[0]),
+                        "layout_type": "table",
+                        "layoutno": k,
+                    }
+                )
+            except:
+                pass
 
         return res
 
