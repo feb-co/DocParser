@@ -9,7 +9,7 @@ DocParser is a powerful tool for LLM traning and other application, for examples
 ## Install
 
 From pip:
-```bash
+```bash (Not support now)
 pip install docparser
 ```
 
