@@ -32,7 +32,7 @@ export LOG_LEVEL="ERROR"
 export DOC_PARSER_MODEL_DIR="xxx"
 export DOC_PARSER_OPENAI_URL="xxx"
 export DOC_PARSER_OPENAI_KEY="xxx"
-export DOC_PARSER_OPENAI_MODEL="gpt-4o"
+export DOC_PARSER_OPENAI_MODEL="gpt-4-0125-preview"
 export DOC_PARSER_OPENAI_RETRY="3"
 docparser-pdf \
     --inputs path/to/file.pdf or path/to/directory \
