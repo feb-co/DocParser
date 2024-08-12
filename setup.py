@@ -34,8 +34,8 @@ def main():
         keywords=["pdf", "BLOOM", "Falcon", "LLM", "ChatGPT", "transformer", "pytorch", "deep learning"],
         license="MIT",
         url="https://github.com/feb-co/DocParser",
-        package_dir={"": "api"},
-        packages=find_packages("src"),
+        package_dir={"": "api/functional"},
+        packages=find_packages("functional"),
         python_requires=">=3.8.0",
         install_requires=get_requires(),
         entry_points={

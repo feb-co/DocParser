@@ -6,7 +6,7 @@ from functools import partial
 import torch
 from torch.utils.data import Dataset
 
-from nougat import NougatModel
+from nougat.model import NougatModel
 from nougat.utils.device import move_to_device
 from nougat.utils.checkpoint import get_checkpoint
 from nougat.postprocessing import markdown_compatible
