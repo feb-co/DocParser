@@ -164,7 +164,7 @@ class TableStructureRecognizer(Recognizer):
         return "Ot"
 
     @staticmethod
-    def construct_table(boxes, is_english=False, html=False):
+    def construct_table(boxes, is_english=False, html=False) -> str:
         cap = ""
         i = 0
         while i < len(boxes):
@@ -184,7 +184,8 @@ class TableStructureRecognizer(Recognizer):
         cap = cap.strip()
 
         if not boxes:
-            return []
+            return ""
+
         for b in boxes:
             b["btype"] = TableStructureRecognizer.blockType(b)
         max_type = Counter([b["btype"] for b in boxes]).items()

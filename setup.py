@@ -31,7 +31,7 @@ def main():
         description="Document parsing tool for LLM training and Rag",
         long_description=open("README.md", "r", encoding="utf-8").read(),
         long_description_content_type="text/markdown",
-        keywords=["pdf", "BLOOM", "Falcon", "LLM", "ChatGPT", "transformer", "pytorch", "deep learning"],
+        keywords=["pdf", "LLM", "ChatGPT", "transformer", "pytorch", "deep learning"],
         license="MIT",
         url="https://github.com/feb-co/DocParser",
         package_dir={"": "api/functional"},

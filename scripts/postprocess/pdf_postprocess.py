@@ -58,7 +58,7 @@ class PdfPostprocess(object):
         new_results = markdown.markdown_text(new_results)
         self.__texts = "\n\n".join(
             [
-                item["text"]
+                str(item["text"])
                 for item in new_results
                 if "figure" not in item["layout_type"]
                 or self.mode in (PdfMode.FigurePlacehold, PdfMode.FigureLatex)

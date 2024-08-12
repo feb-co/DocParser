@@ -952,7 +952,7 @@ class PdfParser:
                    table_layout = self.tbl_det([img])[0]
                    break
                 except:
-                    if retry>3:
+                    if retry>5:
                         break
                     retry += 1
                     pass
@@ -1156,7 +1156,7 @@ class PdfParser:
             logging.error(str(e))
 
     def __images__(
-        self, fnm, zoomin=3, page_from=0, page_to=299, callback=None, is_english=None
+        self, fnm, zoomin=3, page_from=0, page_to=299, is_english=None
     ):
         self.lefted_chars = []
         self.mean_height = []
@@ -1226,8 +1226,6 @@ class PdfParser:
                 j += 1
 
             self.__ocr(i + 1, img, chars, zoomin)
-            if callback and i % 6 == 5:
-                callback(prog=(i + 1) * 0.6 / len(self.page_images), msg="")
 
         if is_english is None:
             self.is_english = [
@@ -1291,7 +1289,7 @@ class PdfParser:
         logging.debug(f"Is it English: {self.is_english}")
 
         if len(self.boxes) == 0 and zoomin < 9:
-            self.__images__(fnm, zoomin * 3, page_from, page_to, callback)
+            self.__images__(fnm, zoomin * 3, page_from, page_to)
 
     def __call__(self, fnm, need_image=True, zoomin=3, return_html=False):
         self.__images__(fnm, zoomin)
