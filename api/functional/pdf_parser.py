@@ -4,11 +4,6 @@ import sys
 work_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(work_dir)
 
-from dotenv import load_dotenv
-
-load_dotenv()
-
-
 from src.parser import PdfParser
 
 
@@ -83,7 +78,7 @@ def get_document_total_pages(
     return pdf_page_number
 
 
-if __name__ == "__main__":
+def main():
     import argparse
     from scripts.file_utils import init_file_path
     from scripts.postprocess import PdfPostprocess, PdfMode, PdfObject
@@ -135,7 +130,7 @@ if __name__ == "__main__":
         mode = PdfMode.FigureLatex
     else:
         raise NotImplementedError
-        
+
     for file in files:
         post_process_obj = PdfPostprocess(
             mode=mode,
@@ -155,3 +150,7 @@ if __name__ == "__main__":
             postprocess=post_process_obj.postprocess,
         )
         post_process_obj.save_data(pdf_object, file, args.output_dir)
+
+
+if __name__ == "__main__":
+    main()

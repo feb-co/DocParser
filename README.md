@@ -1,13 +1,62 @@
-# 📄DocParser
-DocParser is a powerful tool, which support to parse multi type file, includes:
-- txt
-- pdf
-- excel
+# DocParser 📄
+DocParser is a powerful tool for LLM traning and other application, for examples: RAG, which support to parse multi type file, includes:
+
+## Feature 🎉
+
+### File types supported for parsing:
+- [Pdf](#Pdf): 
+
+## Install
+
+From pip:
+```bash
+pip install docparser
+```
+
+From repository:
+```bash
+pip install git+https://github.com/feb-co/DocParser.git
+```
+
+Or install it directly through the installation package:
+```bash
+pip install -e .
+```
 
 ## API/Functional
-### PdfParser
-You can run the flowing test programs:
+### Pdf
+#### From CLI
+You can run the following script to get the pdf parsing results:
 ```shell
-cd PROJECT_DIR
-export PYTHONPATH="$(pwd):$PYTHONPATH"; python api/functional/pdf_parser.py file_path
+export LOG_LEVEL="ERROR"
+export DOC_PARSER_MODEL_DIR="xxx"
+export DOC_PARSER_OPENAI_URL="xxx"
+export DOC_PARSER_OPENAI_KEY="xxx"
+export DOC_PARSER_OPENAI_MODEL="gpt-4o"
+export DOC_PARSER_OPENAI_RETRY="3"
+docparser-pdf \
+    --inputs path/to/file.pdf or path/to/directory \
+    --output_dir output_directory \
+    --page_range '0:1' --mode 'figure latex' \
+    --rendering --use_llm
 ```
+
+The following is a description of the relevant parameters:
+```bash
+usage: docparser-pdf [-h] --inputs INPUTS --output_dir OUTPUT_DIR [--page_range PAGE_RANGE] [--mode {plain,figure placehold,figure latex}] [--rendering] [--use_llm]
+
+options:
+  -h, --help            show this help message and exit
+  --inputs INPUTS       Directory where to store PDFs, or a file path to a single PDF
+  --output_dir OUTPUT_DIR
+                        Directory where to store the output results (md/json/images).
+  --page_range PAGE_RANGE
+                        The page range to parse the PDF, the format is 'start_page:end_page', that is, [start, end). Default: full.
+  --mode {plain,figure placehold,figure latex}
+                        The mode for parsing the PDF, to extract only the plain text or the text plus images.
+  --rendering           Is it necessary to render the recognition results of the input PDF to output the recognition range? Default: False.
+  --use_llm             Do you need to use LLM to format the parsing results? If so, please specify the corresponding parameters through the environment variables: DOC_PARSER_OPENAI_URL, DOC_PARSER_OPENAI_KEY, DOC_PARSER_OPENAI_MODEL. Default: False.
+```
+
+
+#### From Python
