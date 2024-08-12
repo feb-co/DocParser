@@ -20,6 +20,8 @@ pip install git+https://github.com/feb-co/DocParser.git
 
 Or install it directly through the installation package:
 ```bash
+pip install git+https://github.com/feb-co/DocParser.git
+cd DocParser
 pip install -e .
 ```
 
