@@ -1067,7 +1067,7 @@ class PdfParser:
 
         text_list = self.nougat(image_list)
         for i, text in enumerate(text_list):
-            if len(text) > 0 and "[MISSING_PAGE_POST]" not in text:
+            if len(text) > 0 and not text.startswith("[MISSING_PAGE"):
                 self.boxes[index_list[i]]["text"] = text
 
     def __filterout_scraps(self, boxes, ZM):

@@ -25,7 +25,9 @@ class NougatDataset(Dataset):
 
     def __getitem__(self, i):
         if i <= self.size and i >= 0:
-            return self.prepare_fn(self.image_list[i]), self.name if i == self.size - 1 else ""
+            return self.prepare_fn(self.image_list[i]), (
+                self.name if i == self.size - 1 else ""
+            )
         else:
             raise IndexError
 
@@ -53,10 +55,7 @@ class NougatDataset(Dataset):
 
 
 class Nougat(object):
-    def __init__(
-        self,
-        batchsize=5
-    ):
+    def __init__(self, batchsize=5):
         self.model = NougatModel.from_pretrained(
             get_checkpoint(model_tag="0.1.0-small")
         )
@@ -79,15 +78,24 @@ class Nougat(object):
             shuffle=False,
             collate_fn=NougatDataset.ignore_none_collate,
         )
-        
-        predictions =[]
+
+        predictions = []
         for i, (sample, _) in enumerate(tqdm(dataloader)):
             model_output = self.model.inference(
-                image_tensors=sample, early_stopping=False
+                image_tensors=sample, early_stopping=True
             )
             for j, output in enumerate(model_output["predictions"]):
-                output = output.strip()
-                output = re.sub(r"\n{3,}", "\n\n", output).strip()
-                output = markdown_compatible(output)
-                predictions.append(output)
+                if output.strip() == "[MISSING_PAGE_POST]":
+                    predictions.append("[MISSING_PAGE]")
+                elif model_output["repeats"][j] is not None:
+                    if model_output["repeats"][j] > 0:
+                        predictions.append("[MISSING_PAGE]")
+                    else:
+                        predictions.append("[MISSING_PAGE]")
+                else:
+                    output = output.strip()
+                    output = re.sub(r"\n{3,}", "\n\n", output).strip()
+                    output = markdown_compatible(output)
+                    predictions.append(output)
+
         return predictions

@@ -3,6 +3,7 @@ import re
 from collections import Counter
 from copy import deepcopy
 import numpy as np
+import layoutparser as lp
 from huggingface_hub import snapshot_download
 
 from src.vision import Recognizer
@@ -24,7 +25,7 @@ class LayoutRecognizer(Recognizer):
         "Reference",
         "Equation",
     ]
-    
+
     labels_priority = {
         "Table caption": 0,
         "Table": 1,
@@ -56,6 +57,9 @@ class LayoutRecognizer(Recognizer):
 
         self.garbage_layouts = ["footer", "header", "equation", 'figure']
 
+        self.lp_model = lp.AutoLayoutModel("lp://efficientdet/PubLayNet/tf_efficientdet_d1")
+        self.lp_type = ["Figure"]
+
     def __call__(self, image_list, ocr_res, thr=0.2, batch_size=16, drop=True, update_pos=True):
         def __is_garbage(b):
             patt = [
@@ -72,9 +76,46 @@ class LayoutRecognizer(Recognizer):
             return any([re.search(p, b["text"]) for p in patt])
 
         layouts = super().__call__(image_list, thr, batch_size)
-
         assert len(image_list) == len(ocr_res)
         assert len(image_list) == len(layouts)
+
+        for i in range(len(layouts)):
+            lp_layout = self.lp_model.detect(image_list[i])
+            import pdb; pdb.set_trace()
+            add_layout = []
+            for item in lp_layout._blocks:
+                if item.type in self.lp_type:
+                    block = {
+                        "type": item.type.lower(),
+                        "bbox": [
+                            item.block.x_1,
+                            item.block.y_1,
+                            item.block.x_2,
+                            item.block.y_2,
+                        ],
+                        "score": item.score,
+                    }
+                    ii = self.find_overlapped_with_threashold(
+                        {
+                            "x0": block["bbox"][0],
+                            "x1": block["bbox"][2],
+                            "top": block["bbox"][1],
+                            "bottom": block["bbox"][-1],
+                        },
+                        [
+                            {
+                                "x0": b["bbox"][0],
+                                "x1": b["bbox"][2],
+                                "top": b["bbox"][1],
+                                "bottom": b["bbox"][-1],
+                            }
+                            for b in layouts[i]
+                        ],
+                        thr=0.1,
+                    )
+                    if ii is None:
+                        add_layout.append(block)
+            layouts[i] += add_layout
 
         boxes = []
         garbages = {}
@@ -138,7 +179,7 @@ class LayoutRecognizer(Recognizer):
                         garbages[lts_[ii]["type"]].append(bxs[i]["text"])
                         if lts_[ii]["type"] in ["figure", "equation"]:
                             if 'text' not in lts_[ii]:
-                                 lts_[ii]['text'] = ""
+                                lts_[ii]['text'] = ""
                             lts_[ii]['text'] += bxs[i]['text']
                         bxs.pop(i)
                         continue
