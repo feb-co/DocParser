@@ -18,9 +18,15 @@ def pdf_rendering(page_images, boxes):
             "type": box.get("layout_type", ''),
             "bbox": [box["x0"], box["top"], box["x1"], box["bottom"]],
         })
-    assert len(page_images) == len(layout_dict)
     imgs = []
     for key in layout_dict:
-        img = draw_box(page_images[int(key)-1], layout_dict[key], labels, 0.0)
-        imgs.append(img)
+        if 0<=int(key)-1<len(page_images):
+            img = page_images[int(key)-1]
+            try:
+                img = draw_box(img, layout_dict[key], labels, 0.0)
+                imgs.append(img)
+            except:
+                imgs.append(img)
+        else:
+            continue
     return imgs
