@@ -81,7 +81,6 @@ class LayoutRecognizer(Recognizer):
 
         for i in range(len(layouts)):
             lp_layout = self.lp_model.detect(image_list[i])
-            import pdb; pdb.set_trace()
             add_layout = []
             for item in lp_layout._blocks:
                 if item.type in self.lp_type:
