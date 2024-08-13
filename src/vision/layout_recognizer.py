@@ -58,7 +58,7 @@ class LayoutRecognizer(Recognizer):
         self.garbage_layouts = ["footer", "header", "equation", 'figure']
 
         self.lp_model = lp.AutoLayoutModel("lp://efficientdet/PubLayNet/tf_efficientdet_d1")
-        self.lp_type = ["Figure"]
+        self.lp_type = ["Figure", "Text"]
 
     def __call__(self, image_list, ocr_res, thr=0.2, batch_size=16, drop=True, update_pos=True):
         def __is_garbage(b):
