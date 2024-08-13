@@ -207,19 +207,19 @@ def traversal_files(base):
             yield fullname
 
 
-def list_all_files(directory, files):
-    # 遍历目录
+def list_all_files(directory, file_type):
+    new_files = []
     for root, dirs, files in os.walk(directory):
         for file in files:
-            # 获取文件的完整路径
-            full_path = os.path.join(root, file)
-            files.append(full_path)
+            if file.endswith(file_type):
+                full_path = os.path.join(root, file)
+                new_files.append(full_path)
+    return new_files
 
 
-def init_file_path(inputs):
+def init_file_path(inputs, file_type):
     if os.path.isdir(inputs):
-        files = []
-        list_all_files(inputs, files)
+        files = list_all_files(inputs, file_type)
     else:
         files = [inputs]
     return files

@@ -122,7 +122,7 @@ def main():
         print(">>>>>>>>", prog, msg, flush=True)
         pass
 
-    files = init_file_path(args.inputs)
+    files = init_file_path(args.inputs, '.pdf')
     if args.mode == "plain":
         mode = PdfMode.PlainText
     elif args.mode == "figure placehold":
