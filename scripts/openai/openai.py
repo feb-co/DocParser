@@ -1,9 +1,15 @@
 import os
 import time
 import requests
+import logging
 
+from scripts.log_level import LOGING_MAP
 from scripts.nlp.split_text import split_text_by_words_num
 from scripts.openai.prompts import PROMPT_FORMAT, PROMPT_FORMAT_HIS
+
+
+log_level = os.getenv("LOG_LEVEL", "WARNING").upper()
+logging.getLogger().setLevel(LOGING_MAP[log_level])
 
 
 def get_response(payload):
@@ -14,13 +20,13 @@ def get_response(payload):
     idx = 0
     while idx < retry_time:
         try:
-            response = requests.post(
-                url, headers=headers, json=payload
-            )
-            return response.json()['choices'][0]['message']['content']
+            response = requests.post(url, headers=headers, json=payload)
+            return response.json()["choices"][0]["message"]["content"]
         except Exception as e:
+            logging.error(f"OPENAI formatting error: {e}")
             time.sleep(5)
             idx += 1
+    return None
 
 
 def get_format_data(prompt):
@@ -64,13 +70,13 @@ def format_data(text: str):
         if idx == 0:
             prompt = PROMPT_FORMAT.format(data=sub_text)
         else:
-            history_text_str = "\n\n".join(new_split_text[max(0, idx-2):])
-            prompt = PROMPT_FORMAT_HIS.format(last_data=history_text_str, data=text)
-        
+            history_text_str = "\n\n".join(new_split_text[max(0, idx - 2) :])
+            prompt = PROMPT_FORMAT_HIS.format(last_data=history_text_str, data=sub_text)
+
         new_sub_text = get_format_data(prompt)
         if new_sub_text:
             new_split_text.append(new_sub_text)
         else:
             new_split_text.append(sub_text)
-    text = ' '.join(new_split_text)
+    text = " ".join(new_split_text)
     return text

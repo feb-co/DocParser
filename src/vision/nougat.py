@@ -55,7 +55,7 @@ class NougatDataset(Dataset):
 
 
 class Nougat(object):
-    def __init__(self, batchsize=5):
+    def __init__(self, batchsize=10):
         self.model = NougatModel.from_pretrained(
             get_checkpoint(model_tag="0.1.0-small")
         )
