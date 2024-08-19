@@ -6,7 +6,7 @@ DocParser is a powerful tool for LLM traning and other application, for examples
 
 ### File types supported for parsing:
 
-- [Pdf](#Pdf):
+- [Pdf](#Pdf): Use OCR to parse PDF documents and output text in markdown format. The parsing results can be used for LLM pretrain, RAG, etc.
 
 ## Install
 
