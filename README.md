@@ -1,24 +1,29 @@
 # DocParser 📄
+
 DocParser is a powerful tool for LLM traning and other application, for examples: RAG, which support to parse multi type file, includes:
 
 ## Feature 🎉
 
 ### File types supported for parsing:
-- [Pdf](#Pdf): 
+
+- [Pdf](#Pdf):
 
 ## Install
 
 From pip:
-```bash (Not support now)
+
+```bash
 pip install docparser
 ```
 
 From repository:
+
 ```bash
 pip install git+https://github.com/feb-co/DocParser.git
 ```
 
 Or install it directly through the installation package:
+
 ```bash
 git clone https://github.com/feb-co/DocParser.git
 cd DocParser
@@ -26,9 +31,13 @@ pip install -e .
 ```
 
 ## API/Functional
+
 ### Pdf
+
 #### From CLI
+
 You can run the following script to get the pdf parsing results:
+
 ```shell
 export LOG_LEVEL="ERROR"
 export DOC_PARSER_MODEL_DIR="xxx"
@@ -40,10 +49,11 @@ docparser-pdf \
     --inputs path/to/file.pdf or path/to/directory \
     --output_dir output_directory \
     --page_range '0:1' --mode 'figure latex' \
-    --rendering --use_llm
+    --rendering --use_llm --overwrite_result
 ```
 
 The following is a description of the relevant parameters:
+
 ```bash
 usage: docparser-pdf [-h] --inputs INPUTS --output_dir OUTPUT_DIR [--page_range PAGE_RANGE] [--mode {plain,figure placehold,figure latex}] [--rendering] [--use_llm]
 
@@ -58,7 +68,7 @@ options:
                         The mode for parsing the PDF, to extract only the plain text or the text plus images.
   --rendering           Is it necessary to render the recognition results of the input PDF to output the recognition range? Default: False.
   --use_llm             Do you need to use LLM to format the parsing results? If so, please specify the corresponding parameters through the environment variables: DOC_PARSER_OPENAI_URL, DOC_PARSER_OPENAI_KEY, DOC_PARSER_OPENAI_MODEL. Default: False.
+  --overwrite_result    If the parsed target file already exists, should it be rewritten? Default: False.
 ```
-
 
 #### From Python

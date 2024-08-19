@@ -651,7 +651,10 @@ class PdfParser:
                 break
 
             for j in range(i, min(i + 128, len(self.boxes))):
-                if not re.match(prefix, self.boxes[j]["text"]):
+                try:
+                    if not re.match(prefix, self.boxes[j]["text"]):
+                        continue
+                except:
                     continue
                 for k in range(i, j):
                     self.boxes.pop(i)

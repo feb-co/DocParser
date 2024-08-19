@@ -138,3 +138,16 @@ class PdfPostprocess(object):
             open(f"{output_dir}/{file_title}.md", "w", encoding="utf-8").write(
                 pdf_object.texts
             )
+
+    def file_exist(self, input_file: str, output_dir: str):
+        base_name = os.path.basename(input_file)
+        file_title, _ = os.path.splitext(base_name)
+        if self.rendering or self.mode in (
+            PdfMode.FigurePlacehold,
+            PdfMode.FigureLatex,
+        ):
+            full_dir_path = os.path.join(output_dir, file_title)
+        else:
+            full_dir_path = f"{output_dir}/{file_title}.md"
+            
+        return os.path.exists(full_dir_path)

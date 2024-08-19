@@ -116,13 +116,18 @@ def main():
         action="store_true",
         help="Do you need to use LLM to format the parsing results? If so, please specify the corresponding parameters through the environment variables: DOC_PARSER_OPENAI_URL, DOC_PARSER_OPENAI_KEY, DOC_PARSER_OPENAI_MODEL. Default: False.",
     )
+    parser.add_argument(
+        "--overwrite_result",
+        action="store_true",
+        help="If the parsed target file already exists, should it be rewritten? Default: False.",
+    )
     args = parser.parse_args()
 
     def dummy(prog=None, msg=""):
         print(">>>>>>>>", prog, msg, flush=True)
         pass
 
-    files = init_file_path(args.inputs, '.pdf')
+    files = init_file_path(args.inputs, ".pdf")
     if args.mode == "plain":
         mode = PdfMode.PlainText
     elif args.mode == "figure placehold":
@@ -143,6 +148,13 @@ def main():
         else:
             start_page = 0
             end_page = get_document_total_pages(file)
+
+        if not args.overwrite_result and post_process_obj.file_exist(
+            file, args.output_dir
+        ):
+            print(f"The parser result ({file}) exist, will skip...", flush=True)
+            continue
+
         pdf_object: PdfObject = parser_pdf(
             file,
             from_page=int(start_page),
