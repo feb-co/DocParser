@@ -13,7 +13,7 @@ DocParser is a powerful tool for LLM traning and other application, for examples
 From pip:
 
 ```bash
-pip install docparser
+pip install docparser_feb
 ```
 
 From repository:

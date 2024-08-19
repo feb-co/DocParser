@@ -24,7 +24,7 @@ def get_requires():
 
 def main():
     setup(
-        name="doc_parser",
+        name="docparser-feb",
         version=read_version(),
         author="Licheng Wang",
         author_email="244267620@qq.com",
