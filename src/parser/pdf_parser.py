@@ -1185,6 +1185,7 @@ class PdfParser:
             self.total_page = len(self.pdf.pages)
         except Exception as e:
             logging.error(str(e))
+            return False
 
         self.outlines = []
         try:
@@ -1293,6 +1294,8 @@ class PdfParser:
 
         if len(self.boxes) == 0 and zoomin < 9:
             self.__images__(fnm, zoomin * 3, page_from, page_to)
+        
+        return True
 
     def __call__(self, fnm, need_image=True, zoomin=3, return_html=False):
         self.__images__(fnm, zoomin)

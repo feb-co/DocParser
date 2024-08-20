@@ -22,13 +22,16 @@ class Pdf(PdfParser):
     ):
         callback(0.0, msg="Parser is running...")
 
-        self.__images__(
+        results = self.__images__(
             filename if not binary else binary,
             zoomin,
             from_page,
             to_page,
             is_english=is_english,
         )
+        if not results:
+            return None
+            
         callback(0.3, msg="OCR detect finished")
 
         self._layouts_rec()
@@ -67,7 +70,10 @@ def parser_pdf(
         callback=callback,
         is_english=is_english,
     )
-    return postprocess(results, pdf_parser.page_images)
+    if results:
+        return postprocess(results, pdf_parser.page_images)
+    else:
+        return None
 
 
 def get_document_total_pages(
@@ -155,14 +161,17 @@ def main():
             print(f"The parser result ({file}) exist, will skip...", flush=True)
             continue
 
-        pdf_object: PdfObject = parser_pdf(
+        pdf_object = parser_pdf(
             file,
             from_page=int(start_page),
             to_page=int(end_page),
             callback=dummy,
             postprocess=post_process_obj.postprocess,
         )
-        post_process_obj.save_data(pdf_object, file, args.output_dir)
+        if pdf_object:
+            post_process_obj.save_data(pdf_object, file, args.output_dir)
+        else:
+            continue
 
 
 if __name__ == "__main__":
