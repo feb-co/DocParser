@@ -1,12 +1,17 @@
 import os
 import copy
 import json
+import logging
 from enum import Enum
 from dataclasses import dataclass, field
 
+from scripts.log_level import LOGING_MAP
 from scripts import markdown
 from scripts.rendering import pdf_rendering
 from scripts.openai import openai
+
+log_level = os.getenv("LOG_LEVEL", "WARNING").upper()
+logging.getLogger().setLevel(LOGING_MAP[log_level])
 
 
 class PdfMode(Enum):
@@ -75,14 +80,17 @@ class PdfPostprocess(object):
             or self.mode in (PdfMode.FigurePlacehold, PdfMode.FigureLatex)
         ]
 
+        logging.info("pdf rule-based postprocess finished ...")
         if self.use_llm:
             self.__texts = openai.format_data(self.__texts)
+            logging.info("pdf LLM formatting finished ...")
 
         if self.rendering:
             page_images = pdf_rendering.pdf_rendering(
                 page_images,
                 self.__data_json,
             )
+            logging.info("pdf rendering finished ...")
         self.__page_images = page_images
 
         return PdfObject(

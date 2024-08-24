@@ -8,7 +8,7 @@ from src.vision import LayoutRecognizer
 def pdf_rendering(page_images, boxes):
     labels = LayoutRecognizer.labels
     labels.append('')
-    
+
     layout_dict = {}
     for box in boxes:
         if box['page_number'] not in layout_dict:
