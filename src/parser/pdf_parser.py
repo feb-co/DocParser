@@ -343,7 +343,7 @@ class PdfParser:
                     # bxs[i]["x1"] = bxs_next["x1"]
                     # bxs[i]["top"] = (bxs_c["top"] + bxs_next["top"]) / 2
                     # bxs[i]["bottom"] = (bxs_c["bottom"] + bxs_next["bottom"]) / 2
-                    
+
                     bxs[i]["x0"] = min(bxs_c["x0"], bxs_next["x0"])
                     bxs[i]["x1"] = max(bxs_c["x1"], bxs_next["x1"])
                     bxs[i]["top"] = min(bxs_c["top"], bxs_next["top"])
@@ -399,7 +399,7 @@ class PdfParser:
                     bxs.pop(i)
                     continue
 
-                if not bxs_c["text"].strip() and bxs_c["layout_type"] in ("text"):
+                if not bxs_c["text"].strip() and bxs_c["layout_type"] in ("text",):
                     bxs.pop(i)
                     continue
 
@@ -455,20 +455,32 @@ class PdfParser:
                 )
 
                 # features for not concating
-                is_same_witdth = (
-                    abs(bxs_c["x0"] - bxs_next["x0"]) < 1.0
-                    and abs(bxs_c["x1"] - bxs_next["x1"]) < 1.0
-                )
+                def not_same_text_witdth():
+                    is_same_witdth = (
+                        abs(bxs_c["x0"] - bxs_next["x0"]) < 1.0
+                        and abs(bxs_c["x1"] - bxs_next["x1"]) < 1.0
+                    )
+
+                    try:
+                        if (
+                            bxs_c["text"].strip()[-1] in "。？！?"
+                            and not is_same_witdth
+                        ):
+                            return True
+                        elif bxs_c["text"].strip()[-1] in ".!?" and not is_same_witdth:
+                            return True
+                        else:
+                            return False
+                    except:
+                        return False
+
                 is_not_concatting = [
                     (
                         "layoutno" in bxs_c
                         and "layoutno" in bxs_next
                         and bxs_c.get("layoutno", 0) != bxs_next.get("layoutno", 0)
                     ),
-                    bxs_c["text"].strip()[-1] in "。？！?" and not is_same_witdth,
-                    self.is_english
-                    and bxs_c["text"].strip()[-1] in ".!?"
-                    and not is_same_witdth,
+                    not_same_text_witdth(),
                     bxs_c["page_number"] == bxs_next["page_number"]
                     and bxs_next["top"] - bxs_c["bottom"]
                     > self.mean_height[bxs_next["page_number"] - 1] * 1.5,
@@ -891,6 +903,7 @@ class PdfParser:
 
         # crop table out and add caption
         logging.debug("Table processing...")
+
         def extract_table_from_img(img, start_x, start_y, page_number):
             bxs = self.ocr.detect(np.array(img))
             if not bxs:
@@ -952,10 +965,10 @@ class PdfParser:
             retry = 0
             while True:
                 try:
-                   table_layout = self.tbl_det([img])[0]
-                   break
+                    table_layout = self.tbl_det([img])[0]
+                    break
                 except:
-                    if retry>5:
+                    if retry > 5:
                         break
                     retry += 1
                     pass
@@ -1158,9 +1171,7 @@ class PdfParser:
         except Exception as e:
             logging.error(str(e))
 
-    def __images__(
-        self, fnm, zoomin=3, page_from=0, page_to=299, is_english=None
-    ):
+    def __images__(self, fnm, zoomin=3, page_from=0, page_to=299, is_english=None):
         self.lefted_chars = []
         self.mean_height = []
         self.mean_width = []
@@ -1294,7 +1305,7 @@ class PdfParser:
 
         if len(self.boxes) == 0 and zoomin < 9:
             self.__images__(fnm, zoomin * 3, page_from, page_to)
-        
+
         return True
 
     def __call__(self, fnm, need_image=True, zoomin=3, return_html=False):

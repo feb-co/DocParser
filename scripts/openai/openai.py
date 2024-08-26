@@ -33,7 +33,6 @@ def get_format_data(prompt):
     payload = {
         "model": os.environ.get("DOC_PARSER_OPENAI_MODEL"),
         "temperature": 0.01,
-        "repetition_penalty": 1.2,
         "top_p": 0.4,
         "stream": False,
         "messages": [
