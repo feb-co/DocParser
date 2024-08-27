@@ -14,21 +14,102 @@ from . import rag_tokenizer
 
 
 all_codecs = [
-    'utf-8', 'gb2312', 'gbk', 'utf_16', 'ascii', 'big5', 'big5hkscs',
-    'cp037', 'cp273', 'cp424', 'cp437',
-    'cp500', 'cp720', 'cp737', 'cp775', 'cp850', 'cp852', 'cp855', 'cp856', 'cp857',
-    'cp858', 'cp860', 'cp861', 'cp862', 'cp863', 'cp864', 'cp865', 'cp866', 'cp869',
-    'cp874', 'cp875', 'cp932', 'cp949', 'cp950', 'cp1006', 'cp1026', 'cp1125',
-    'cp1140', 'cp1250', 'cp1251', 'cp1252', 'cp1253', 'cp1254', 'cp1255', 'cp1256',
-    'cp1257', 'cp1258', 'euc_jp', 'euc_jis_2004', 'euc_jisx0213', 'euc_kr',
-    'gb2312', 'gb18030', 'hz', 'iso2022_jp', 'iso2022_jp_1', 'iso2022_jp_2',
-    'iso2022_jp_2004', 'iso2022_jp_3', 'iso2022_jp_ext', 'iso2022_kr', 'latin_1',
-    'iso8859_2', 'iso8859_3', 'iso8859_4', 'iso8859_5', 'iso8859_6', 'iso8859_7',
-    'iso8859_8', 'iso8859_9', 'iso8859_10', 'iso8859_11', 'iso8859_13',
-    'iso8859_14', 'iso8859_15', 'iso8859_16', 'johab', 'koi8_r', 'koi8_t', 'koi8_u',
-    'kz1048', 'mac_cyrillic', 'mac_greek', 'mac_iceland', 'mac_latin2', 'mac_roman',
-    'mac_turkish', 'ptcp154', 'shift_jis', 'shift_jis_2004', 'shift_jisx0213',
-    'utf_32', 'utf_32_be', 'utf_32_le''utf_16_be', 'utf_16_le', 'utf_7'
+    "utf-8",
+    "gb2312",
+    "gbk",
+    "utf_16",
+    "ascii",
+    "big5",
+    "big5hkscs",
+    "cp037",
+    "cp273",
+    "cp424",
+    "cp437",
+    "cp500",
+    "cp720",
+    "cp737",
+    "cp775",
+    "cp850",
+    "cp852",
+    "cp855",
+    "cp856",
+    "cp857",
+    "cp858",
+    "cp860",
+    "cp861",
+    "cp862",
+    "cp863",
+    "cp864",
+    "cp865",
+    "cp866",
+    "cp869",
+    "cp874",
+    "cp875",
+    "cp932",
+    "cp949",
+    "cp950",
+    "cp1006",
+    "cp1026",
+    "cp1125",
+    "cp1140",
+    "cp1250",
+    "cp1251",
+    "cp1252",
+    "cp1253",
+    "cp1254",
+    "cp1255",
+    "cp1256",
+    "cp1257",
+    "cp1258",
+    "euc_jp",
+    "euc_jis_2004",
+    "euc_jisx0213",
+    "euc_kr",
+    "gb2312",
+    "gb18030",
+    "hz",
+    "iso2022_jp",
+    "iso2022_jp_1",
+    "iso2022_jp_2",
+    "iso2022_jp_2004",
+    "iso2022_jp_3",
+    "iso2022_jp_ext",
+    "iso2022_kr",
+    "latin_1",
+    "iso8859_2",
+    "iso8859_3",
+    "iso8859_4",
+    "iso8859_5",
+    "iso8859_6",
+    "iso8859_7",
+    "iso8859_8",
+    "iso8859_9",
+    "iso8859_10",
+    "iso8859_11",
+    "iso8859_13",
+    "iso8859_14",
+    "iso8859_15",
+    "iso8859_16",
+    "johab",
+    "koi8_r",
+    "koi8_t",
+    "koi8_u",
+    "kz1048",
+    "mac_cyrillic",
+    "mac_greek",
+    "mac_iceland",
+    "mac_latin2",
+    "mac_roman",
+    "mac_turkish",
+    "ptcp154",
+    "shift_jis",
+    "shift_jis_2004",
+    "shift_jisx0213",
+    "utf_32",
+    "utf_32_be",
+    "utf_32_le" "utf_16_be",
+    "utf_16_le",
+    "utf_7",
 ]
 
 
@@ -48,6 +129,7 @@ def find_codec(blob):
 
     return "utf-8"
 
+
 QUESTION_PATTERN = [
     r"第([零一二三四五六七八九十百0-9]+)问",
     r"第([零一二三四五六七八九十百0-9]+)条",
@@ -62,55 +144,61 @@ QUESTION_PATTERN = [
     r"QUESTION ([0-9]+)",
 ]
 
+
 def has_qbullet(reg, box, last_box, last_index, last_bull, bull_x0_list):
-    section, last_section = box['text'], last_box['text']
-    q_reg = r'(\w|\W)*?(?:？|\?|\n|$)+'
+    section, last_section = box["text"], last_box["text"]
+    q_reg = r"(\w|\W)*?(?:？|\?|\n|$)+"
     full_reg = reg + q_reg
     has_bull = re.match(full_reg, section)
     index_str = None
     if has_bull:
-        if 'x0' not in last_box:
-            last_box['x0'] = box['x0']
-        if 'top' not in last_box:
-            last_box['top'] = box['top']
-        if last_bull and box['x0']-last_box['x0']>10:
+        if "x0" not in last_box:
+            last_box["x0"] = box["x0"]
+        if "top" not in last_box:
+            last_box["top"] = box["top"]
+        if last_bull and box["x0"] - last_box["x0"] > 10:
             return None, last_index
-        if not last_bull and box['x0'] >= last_box['x0'] and box['top'] - last_box['top'] < 20:
+        if (
+            not last_bull
+            and box["x0"] >= last_box["x0"]
+            and box["top"] - last_box["top"] < 20
+        ):
             return None, last_index
         avg_bull_x0 = 0
         if bull_x0_list:
             avg_bull_x0 = sum(bull_x0_list) / len(bull_x0_list)
         else:
-            avg_bull_x0 = box['x0']
-        if box['x0'] - avg_bull_x0 > 10:
+            avg_bull_x0 = box["x0"]
+        if box["x0"] - avg_bull_x0 > 10:
             return None, last_index
         index_str = has_bull.group(1)
         index = index_int(index_str)
-        if last_section[-1] == ':' or last_section[-1] == '：':
+        if last_section[-1] == ":" or last_section[-1] == "：":
             return None, last_index
         if not last_index or index >= last_index:
-            bull_x0_list.append(box['x0'])
+            bull_x0_list.append(box["x0"])
             return has_bull, index
-        if section[-1] == '?' or section[-1] == '？':
-            bull_x0_list.append(box['x0'])
+        if section[-1] == "?" or section[-1] == "？":
+            bull_x0_list.append(box["x0"])
             return has_bull, index
-        if box['layout_type'] == 'title':
-            bull_x0_list.append(box['x0'])
+        if box["layout_type"] == "title":
+            bull_x0_list.append(box["x0"])
             return has_bull, index
         pure_section = section.lstrip(re.match(reg, section).group()).lower()
-        ask_reg = r'(what|when|where|how|why|which|who|whose|为什么|为啥|哪)'
+        ask_reg = r"(what|when|where|how|why|which|who|whose|为什么|为啥|哪)"
         if re.match(ask_reg, pure_section):
-            bull_x0_list.append(box['x0'])
+            bull_x0_list.append(box["x0"])
             return has_bull, index
     return None, last_index
+
 
 def index_int(index_str):
     res = -1
     try:
-        res=int(index_str)
+        res = int(index_str)
     except ValueError:
         try:
-            res=w2n.word_to_num(index_str)
+            res = w2n.word_to_num(index_str)
         except ValueError:
             try:
                 res = cn2an(index_str)
@@ -120,6 +208,7 @@ def index_int(index_str):
                 except ValueError:
                     return -1
     return res
+
 
 def qbullets_category(sections):
     global QUESTION_PATTERN
@@ -138,31 +227,36 @@ def qbullets_category(sections):
         maxium = h
     return res, QUESTION_PATTERN[res]
 
-BULLET_PATTERN = [[
-    r"第[零一二三四五六七八九十百0-9]+(分?编|部分)",
-    r"第[零一二三四五六七八九十百0-9]+章",
-    r"第[零一二三四五六七八九十百0-9]+节",
-    r"第[零一二三四五六七八九十百0-9]+条",
-    r"[\(（][零一二三四五六七八九十百]+[\)）]",
-], [
-    r"第[0-9]+章",
-    r"第[0-9]+节",
-    r"[0-9]{,2}[\. 、]",
-    r"[0-9]{,2}\.[0-9]{,2}[^a-zA-Z/%~-]",
-    r"[0-9]{,2}\.[0-9]{,2}\.[0-9]{,2}",
-    r"[0-9]{,2}\.[0-9]{,2}\.[0-9]{,2}\.[0-9]{,2}",
-], [
-    r"第[零一二三四五六七八九十百0-9]+章",
-    r"第[零一二三四五六七八九十百0-9]+节",
-    r"[零一二三四五六七八九十百]+[ 、]",
-    r"[\(（][零一二三四五六七八九十百]+[\)）]",
-    r"[\(（][0-9]{,2}[\)）]",
-], [
-    r"PART (ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN)",
-    r"Chapter (I+V?|VI*|XI|IX|X)",
-    r"Section [0-9]+",
-    r"Article [0-9]+"
-]
+
+BULLET_PATTERN = [
+    [
+        r"第[零一二三四五六七八九十百0-9]+(分?编|部分)",
+        r"第[零一二三四五六七八九十百0-9]+章",
+        r"第[零一二三四五六七八九十百0-9]+节",
+        r"第[零一二三四五六七八九十百0-9]+条",
+        r"[\(（][零一二三四五六七八九十百]+[\)）]",
+    ],
+    [
+        r"第[0-9]+章",
+        r"第[0-9]+节",
+        r"[0-9]{,2}[\. 、]",
+        r"[0-9]{,2}\.[0-9]{,2}[^a-zA-Z/%~-]",
+        r"[0-9]{,2}\.[0-9]{,2}\.[0-9]{,2}",
+        r"[0-9]{,2}\.[0-9]{,2}\.[0-9]{,2}\.[0-9]{,2}",
+    ],
+    [
+        r"第[零一二三四五六七八九十百0-9]+章",
+        r"第[零一二三四五六七八九十百0-9]+节",
+        r"[零一二三四五六七八九十百]+[ 、]",
+        r"[\(（][零一二三四五六七八九十百]+[\)）]",
+        r"[\(（][0-9]{,2}[\)）]",
+    ],
+    [
+        r"PART (ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN)",
+        r"Chapter (I+V?|VI*|XI|IX|X)",
+        r"Section [0-9]+",
+        r"Article [0-9]+",
+    ],
 ]
 
 
@@ -172,9 +266,7 @@ def random_choices(arr, k):
 
 
 def not_bullet(line):
-    patt = [
-        r"0", r"[0-9]+ +[0-9~个只-]", r"[0-9]+\.{2,}"
-    ]
+    patt = [r"0", r"[0-9]+ +[0-9~个只-]", r"[0-9]+\.{2,}"]
     return any([re.match(r, line) for r in patt])
 
 
@@ -185,7 +277,9 @@ def bullets_category(sections):
         for sec in sections:
             for p in pro:
                 if re.match(p, sec) and not not_bullet(sec):
-                    import pdb; pdb.set_trace()
+                    import pdb
+
+                    pdb.set_trace()
                     hits[i] += 1
                     break
     maxium = 0
@@ -200,7 +294,8 @@ def bullets_category(sections):
 
 def is_english(texts):
     eng = 0
-    if not texts: return False
+    if not texts:
+        return False
     for t in texts:
         if re.match(r"[a-zA-Z]{2,}", t.strip()):
             eng += 1
@@ -220,8 +315,8 @@ def tokenize_chunks(chunks, doc, eng, pdf_parser):
     res = []
     # wrap up as es documents
     for ck in chunks:
-        if len(ck.strip()) == 0:continue
-        print("--", ck)
+        if len(ck.strip()) == 0:
+            continue
         d = copy.deepcopy(doc)
         if pdf_parser:
             try:
@@ -239,8 +334,8 @@ def tokenize_chunks_docx(chunks, doc, eng, images):
     res = []
     # wrap up as es documents
     for ck, image in zip(chunks, images):
-        if len(ck.strip()) == 0:continue
-        print("--", ck)
+        if len(ck.strip()) == 0:
+            continue
         d = copy.deepcopy(doc)
         d["image"] = image
         tokenize(d, ck, eng)
@@ -258,14 +353,16 @@ def tokenize_table(tbls, doc, eng, batch_size=10):
             d = copy.deepcopy(doc)
             tokenize(d, rows, eng)
             d["content_with_weight"] = rows
-            if img: d["image"] = img
-            if poss: add_positions(d, poss)
+            if img:
+                d["image"] = img
+            if poss:
+                add_positions(d, poss)
             res.append(d)
             continue
         de = "; " if eng else "； "
         for i in range(0, len(rows), batch_size):
             d = copy.deepcopy(doc)
-            r = de.join(rows[i:i + batch_size])
+            r = de.join(rows[i : i + batch_size])
             tokenize(d, r, eng)
             d["image"] = img
             add_positions(d, poss)
@@ -282,19 +379,25 @@ def add_positions(d, poss):
     for pn, left, right, top, bottom in poss:
         d["page_num_int"].append(int(pn + 1))
         d["top_int"].append(int(top))
-        d["position_int"].append((int(pn + 1), int(left), int(right), int(top), int(bottom)))
+        d["position_int"].append(
+            (int(pn + 1), int(left), int(right), int(top), int(bottom))
+        )
 
 
 def remove_contents_table(sections, eng=False):
     i = 0
     while i < len(sections):
+
         def get(i):
             nonlocal sections
-            return (sections[i] if isinstance(sections[i],
-                    type("")) else sections[i][0]).strip()
+            return (
+                sections[i] if isinstance(sections[i], type("")) else sections[i][0]
+            ).strip()
 
-        if not re.match(r"(contents|目录|目次|table of contents|致谢|acknowledge)$",
-                        re.sub(r"( | |\u3000)+", "", get(i).split("@@")[0], re.IGNORECASE)):
+        if not re.match(
+            r"(contents|目录|目次|table of contents|致谢|acknowledge)$",
+            re.sub(r"( | |\u3000)+", "", get(i).split("@@")[0], re.IGNORECASE),
+        ):
             i += 1
             continue
         sections.pop(i)
@@ -341,9 +444,9 @@ def make_colon_as_title(sections):
 
 def title_frequency(bull, sections):
     bullets_size = len(BULLET_PATTERN[bull])
-    levels = [bullets_size+1 for _ in range(len(sections))]
+    levels = [bullets_size + 1 for _ in range(len(sections))]
     if not sections or bull < 0:
-        return bullets_size+1, levels
+        return bullets_size + 1, levels
 
     for i, (txt, layout) in enumerate(sections):
         for j, p in enumerate(BULLET_PATTERN[bull]):
@@ -353,8 +456,8 @@ def title_frequency(bull, sections):
         else:
             if re.search(r"(title|head)", layout) and not not_title(txt.split("@")[0]):
                 levels[i] = bullets_size
-    most_level = bullets_size+1
-    for l, c in sorted(Counter(levels).items(), key=lambda x:x[1]*-1):
+    most_level = bullets_size + 1
+    for l, c in sorted(Counter(levels).items(), key=lambda x: x[1] * -1):
         if l <= bullets_size:
             most_level = l
             break
@@ -374,11 +477,15 @@ def hierarchical_merge(bull, sections, depth):
         return []
     if isinstance(sections[0], type("")):
         sections = [(s, "") for s in sections]
-    sections = [(t, o) for t, o in sections if
-                t and len(t.split("@")[0].strip()) > 1 and not re.match(r"[0-9]+$", t.split("@")[0].strip())]
+    sections = [
+        (t, o)
+        for t, o in sections
+        if t
+        and len(t.split("@")[0].strip()) > 1
+        and not re.match(r"[0-9]+$", t.split("@")[0].strip())
+    ]
     bullets_size = len(BULLET_PATTERN[bull])
     levels = [[] for _ in range(bullets_size + 2)]
-
 
     for i, (txt, layout) in enumerate(sections):
         for j, p in enumerate(BULLET_PATTERN[bull]):
@@ -391,8 +498,6 @@ def hierarchical_merge(bull, sections, depth):
             else:
                 levels[bullets_size + 1].append(i)
     sections = [t for t, _ in sections]
-
-    # for s in sections: print("--", s)
 
     def binary_search(arr, target):
         if not arr:
@@ -440,7 +545,6 @@ def hierarchical_merge(bull, sections, depth):
 
     for i in range(len(cks)):
         cks[i] = [sections[j] for j in cks[i][::-1]]
-        print("--------------\n", "\n* ".join(cks[i]))
 
     res = [[]]
     num = [0]
@@ -473,7 +577,7 @@ def naive_merge(sections, chunk_token_num=128, delimiter="\n。；！？"):
         tnum = num_tokens_from_string(t)
         if tnum < 8:
             pos = ""
-        # Ensure that the length of the merged chunk does not exceed chunk_token_num  
+        # Ensure that the length of the merged chunk does not exceed chunk_token_num
         if tk_nums[-1] > chunk_token_num:
 
             if t.find(pos) < 0:
@@ -492,22 +596,24 @@ def naive_merge(sections, chunk_token_num=128, delimiter="\n。；！？"):
         s, e = 0, 1
         while e < len(sec):
             if sec[e] in delimiter:
-                add_chunk(sec[s: e + 1], pos)
+                add_chunk(sec[s : e + 1], pos)
                 s = e + 1
                 e = s + 1
             else:
                 e += 1
         if s < e:
-            add_chunk(sec[s: e], pos)
+            add_chunk(sec[s:e], pos)
 
     return cks
 
+
 def docx_question_level(p):
-    if p.style.name.startswith('Heading'):
-        return int(p.style.name.split(' ')[-1]), re.sub(r"\u3000", " ", p.text).strip()
+    if p.style.name.startswith("Heading"):
+        return int(p.style.name.split(" ")[-1]), re.sub(r"\u3000", " ", p.text).strip()
     else:
         return 0, re.sub(r"\u3000", " ", p.text).strip()
-    
+
+
 def concat_img(img1, img2):
     if img1 and not img2:
         return img1
@@ -520,12 +626,13 @@ def concat_img(img1, img2):
 
     new_width = max(width1, width2)
     new_height = height1 + height2
-    new_image = Image.new('RGB', (new_width, new_height))
+    new_image = Image.new("RGB", (new_width, new_height))
 
     new_image.paste(img1, (0, 0))
     new_image.paste(img2, (0, height1))
 
     return new_image
+
 
 def naive_merge_docx(sections, chunk_token_num=128, delimiter="\n。；！？"):
     if not sections:
@@ -554,6 +661,6 @@ def naive_merge_docx(sections, chunk_token_num=128, delimiter="\n。；！？"):
             tk_nums[-1] += tnum
 
     for sec, image in sections:
-        add_chunk(sec, image, '')
+        add_chunk(sec, image, "")
 
     return cks, images

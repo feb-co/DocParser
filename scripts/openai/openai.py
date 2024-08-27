@@ -2,6 +2,7 @@ import os
 import time
 import requests
 import logging
+from tqdm import tqdm
 
 from scripts.log_level import LOGING_MAP
 from scripts.nlp.split_text import split_text_by_words_num
@@ -12,15 +13,18 @@ log_level = os.getenv("LOG_LEVEL", "WARNING").upper()
 logging.getLogger().setLevel(LOGING_MAP[log_level])
 
 
+token = os.getenv("DOC_PARSER_OPENAI_KEY", "")
+url = os.getenv("DOC_PARSER_OPENAI_URL", "")
+retry_time = int(os.getenv("DOC_PARSER_OPENAI_RETRY", 0))
+model_type = os.getenv("DOC_PARSER_OPENAI_MODEL", "")
+
+
 def get_response(payload):
-    token = os.environ.get("DOC_PARSER_OPENAI_KEY")
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    url = os.environ.get("DOC_PARSER_OPENAI_URL")
-    retry_time = int(os.environ.get("DOC_PARSER_OPENAI_RETRY"))
     idx = 0
     while idx < retry_time:
         try:
-            response = requests.post(url, headers=headers, json=payload)
+            response = requests.post(url, headers=headers, json=payload, timeout=180)
             return response.json()["choices"][0]["message"]["content"]
         except Exception as e:
             logging.error(f"OPENAI formatting error: {e}")
@@ -31,7 +35,7 @@ def get_response(payload):
 
 def get_format_data(prompt):
     payload = {
-        "model": os.environ.get("DOC_PARSER_OPENAI_MODEL"),
+        "model": model_type,
         "temperature": 0.01,
         "top_p": 0.4,
         "stream": False,
@@ -65,7 +69,9 @@ def get_format_data(prompt):
 def format_data(text: str):
     split_texts: list = split_text_by_words_num(text)
     new_split_text = []
-    for idx, sub_text in enumerate(split_texts):
+    for idx, sub_text in enumerate(
+        tqdm(split_texts, desc="begin format text by llm", leave=False, position=0)
+    ):
         if idx == 0:
             prompt = PROMPT_FORMAT.format(data=sub_text)
         else:

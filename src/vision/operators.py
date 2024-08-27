@@ -20,6 +20,7 @@ import cv2
 import numpy as np
 import math
 from PIL import Image
+import logging
 
 
 class DecodeImage(object):
@@ -402,7 +403,7 @@ class DetResizeForTest(object):
                 return None, (None, None)
             img = cv2.resize(img, (int(resize_w), int(resize_h)))
         except BaseException:
-            print(img.shape, resize_w, resize_h)
+            logging.error(img.shape, resize_w, resize_h)
             sys.exit(0)
         ratio_h = resize_h / float(h)
         ratio_w = resize_w / float(w)

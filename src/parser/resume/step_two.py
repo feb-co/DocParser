@@ -574,7 +574,6 @@ def parse(cv):
 
     cv["tob_resume_id"] = str(cv["tob_resume_id"])
     cv["id"] = cv["tob_resume_id"]
-    print("CCCCCCCCCCCCCCC")
 
     return dealWithInt64(cv)
 

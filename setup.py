@@ -41,6 +41,7 @@ def main():
         entry_points={
         "console_scripts": [
             "docparser-pdf = pdf_parser:main",
+            "docparser-html = html_parser:main",
         ],
     },
         classifiers=[

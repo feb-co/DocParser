@@ -172,7 +172,6 @@ def refactor(df):
     clms = list(set(clms))
 
     df = df.reindex(sorted(clms), axis=1)
-    #print(json.dumps(list(df.columns.values)), "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL")
     for c in clms:
         df[c] = df[c].map(
             lambda s: str(s).replace(
@@ -182,5 +181,4 @@ def refactor(df):
                 "\\n").replace(
                 "\r",
                 "\\n"))
-    # print(df.values.tolist())
     return dict(zip([n.split(" ")[0] for n in FIELDS], df.values.tolist()[0]))

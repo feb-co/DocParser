@@ -13,6 +13,7 @@
 
 import os
 import PIL
+import logging
 from PIL import ImageDraw
 
 
@@ -24,7 +25,7 @@ def save_results(image_list, results, labels, output_dir='output/', threshold=0.
 
         out_path = os.path.join(output_dir, f"{idx}.jpg")
         im.save(out_path, quality=95)
-        print("save result to: " + out_path)
+        logging.info("save result to: " + out_path)
 
 
 def draw_box(im, result, lables, threshold=0.5):

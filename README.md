@@ -7,6 +7,7 @@ DocParser is a powerful tool for LLM traning and other application, for examples
 ### File types supported for parsing:
 
 - [Pdf](#Pdf): Use OCR to parse PDF documents and output text in markdown format. The parsing results can be used for LLM pretrain, RAG, etc.
+- [Html](#Html): Use [jina](https://jina.ai/reader) to parse multi html pages and output text in markdown.
 
 ## Install
 
@@ -69,6 +70,19 @@ options:
   --rendering           Is it necessary to render the recognition results of the input PDF to output the recognition range? Default: False.
   --use_llm             Do you need to use LLM to format the parsing results? If so, please specify the corresponding parameters through the environment variables: DOC_PARSER_OPENAI_URL, DOC_PARSER_OPENAI_KEY, DOC_PARSER_OPENAI_MODEL. Default: False.
   --overwrite_result    If the parsed target file already exists, should it be rewritten? Default: False.
+```
+
+#### From Python
+
+
+### Html
+
+#### From CLI
+
+You can run the following script to get the html parsing results:
+
+```bash
+docparser-html https://github.com/mem0ai/mem0
 ```
 
 #### From Python

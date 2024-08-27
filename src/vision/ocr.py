@@ -620,7 +620,4 @@ class OCR(object):
         end = time.time()
         time_dict['all'] = end - start
 
-        # for bno in range(len(img_crop_list)):
-        #    print(f"{bno}, {rec_res[bno]}")
-
         return list(zip([a.tolist() for a in filter_boxes], filter_rec_res))

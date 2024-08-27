@@ -2,6 +2,7 @@ import os
 import re
 import torch
 from tqdm import tqdm
+from langdetect import detect, LangDetectException
 
 import xgboost as xgb
 from io import BytesIO
@@ -1171,6 +1172,20 @@ class PdfParser:
         except Exception as e:
             logging.error(str(e))
 
+    def _detect_language(self):
+        is_english = []
+        for i in range(len(self.boxes)):
+            text = "".join(
+                [c["text"] for c in self.boxes[i] if len(c["text"].strip()) > 0]
+            )
+            try:
+                # 使用 langdetect 检测语言
+                is_english.append(detect(text) == 'en')
+            except LangDetectException:
+                # 如果检测失败，默认为非英文
+                is_english.append(False)
+        return is_english
+
     def __images__(self, fnm, zoomin=3, page_from=0, page_to=299, is_english=None):
         self.lefted_chars = []
         self.mean_height = []
@@ -1218,7 +1233,7 @@ class PdfParser:
 
         logging.debug("Images converted.")
 
-        for i, img in enumerate(tqdm(self.page_images)):
+        for i, img in enumerate(tqdm(self.page_images, desc="begin parser pdf pages", leave=False, position=0)):
             chars = []
             self.mean_height.append(
                 np.median(sorted([c["height"] for c in chars])) if chars else 0
@@ -1243,19 +1258,10 @@ class PdfParser:
             self.__ocr(i + 1, img, chars, zoomin)
 
         if is_english is None:
-            self.is_english = [
-                re.search(
-                    r"[a-zA-Z0-9,/¸;:'\[\]\(\)!@#$%^&*\"?<>._-]{30,}",
-                    "".join(
-                        [c["text"] for c in self.boxes[i] if len(c["text"].strip()) > 0]
-                    ),
-                )
-                for i in range(len(self.boxes))
-            ]
-
+            is_english = self._detect_language()
             if (
-                sum([1 if e else 0 for e in self.is_english])
-                > len(self.page_images) / 2
+                sum([1 if e else 0 for e in is_english])
+                > len(is_english) / 3
             ):
                 self.is_english = True
             else:
@@ -1356,7 +1362,3 @@ class PlainParser(object):
     @staticmethod
     def remove_tag(txt):
         raise NotImplementedError
-
-
-if __name__ == "__main__":
-    pass

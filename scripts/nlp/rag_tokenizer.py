@@ -21,12 +21,15 @@ import os
 import re
 import string
 import sys
+import logging
 from hanziconv import HanziConv
-from huggingface_hub import snapshot_download
 from nltk import word_tokenize
 from nltk.stem import PorterStemmer, WordNetLemmatizer
 
-from scripts.file_utils import get_project_base_directory
+from scripts.log_level import LOGING_MAP
+
+log_level = os.getenv("LOG_LEVEL", "WARNING").upper()
+logging.getLogger().setLevel(LOGING_MAP[log_level])
 
 
 class RagTokenizer:
@@ -37,9 +40,9 @@ class RagTokenizer:
         return str(("DD" + (line[::-1].lower())).encode("utf-8"))[2:-1]
 
     def loadDict_(self, fnm):
-        print("[HUQIE]:Build trie", fnm, file=sys.stderr)
+        logging.info("[HUQIE]:Build trie", fnm, file=sys.stderr)
         try:
-            of = open(fnm, "r", encoding='utf-8')
+            of = open(fnm, "r", encoding="utf-8")
             while True:
                 line = of.readline()
                 if not line:
@@ -47,37 +50,21 @@ class RagTokenizer:
                 line = re.sub(r"[\r\n]+", "", line)
                 line = re.split(r"[ \t]", line)
                 k = self.key_(line[0])
-                F = int(math.log(float(line[1]) / self.DENOMINATOR) + .5)
+                F = int(math.log(float(line[1]) / self.DENOMINATOR) + 0.5)
                 if k not in self.trie_ or self.trie_[k][0] < F:
                     self.trie_[self.key_(line[0])] = (F, line[2])
                 self.trie_[self.rkey_(line[0])] = 1
             self.trie_.save(fnm + ".trie")
             of.close()
         except Exception as e:
-            print("[HUQIE]:Faild to build trie, ", fnm, e, file=sys.stderr)
+            logging.error("[HUQIE]:Faild to build trie, ", fnm, e, file=sys.stderr)
 
     def __init__(self, debug=False):
-        self.DEBUG = debug
         self.DENOMINATOR = 1000000
         self.trie_ = datrie.Trie(string.printable)
-        self.DIR_ = os.path.join(
-            get_project_base_directory(),
-            os.environ.get("DOC_PARSER_MODEL_DIR"),
-            "huqie"
-        )
-
         self.stemmer = PorterStemmer()
         self.lemmatizer = WordNetLemmatizer()
-
         self.SPLIT_CHAR = r"([ ,\.<>/?;'\[\]\\`!@#$%^&*\(\)\{\}\|_+=《》，。？、；‘’：“”【】~！￥%……（）——-]+|[a-z\.-]+|[0-9,\.-]+)"
-        try:
-            self.trie_ = datrie.Trie.load(self.DIR_ + ".txt.trie")
-            return
-        except Exception as e:
-            print("[HUQIE]:Build default trie", file=sys.stderr)
-            self.trie_ = datrie.Trie(string.printable)
-
-        self.loadDict_(self.DIR_ + ".txt")
 
     def loadUserDict(self, fnm):
         try:
@@ -98,8 +85,10 @@ class RagTokenizer:
             if inside_code == 0x3000:
                 inside_code = 0x0020
             else:
-                inside_code -= 0xfee0
-            if inside_code < 0x0020 or inside_code > 0x7e:  # 转完之后不是半角字符返回原来的字符
+                inside_code -= 0xFEE0
+            if (
+                inside_code < 0x0020 or inside_code > 0x7E
+            ):  # 转完之后不是半角字符返回原来的字符
                 rstring += uchar
             else:
                 rstring += chr(inside_code)
@@ -119,13 +108,18 @@ class RagTokenizer:
         # pruning
         S = s + 1
         if s + 2 <= len(chars):
-            t1, t2 = "".join(chars[s:s + 1]), "".join(chars[s:s + 2])
-            if self.trie_.has_keys_with_prefix(self.key_(t1)) and not self.trie_.has_keys_with_prefix(
-                    self.key_(t2)):
+            t1, t2 = "".join(chars[s : s + 1]), "".join(chars[s : s + 2])
+            if self.trie_.has_keys_with_prefix(
+                self.key_(t1)
+            ) and not self.trie_.has_keys_with_prefix(self.key_(t2)):
                 S = s + 2
-        if len(preTks) > 2 and len(
-                preTks[-1][0]) == 1 and len(preTks[-2][0]) == 1 and len(preTks[-3][0]) == 1:
-            t1 = preTks[-1][0] + "".join(chars[s:s + 1])
+        if (
+            len(preTks) > 2
+            and len(preTks[-1][0]) == 1
+            and len(preTks[-2][0]) == 1
+            and len(preTks[-3][0]) == 1
+        ):
+            t1 = preTks[-1][0] + "".join(chars[s : s + 1])
             if self.trie_.has_keys_with_prefix(self.key_(t1)):
                 S = s + 2
 
@@ -142,18 +136,18 @@ class RagTokenizer:
                 if k in self.trie_:
                     pretks.append((t, self.trie_[k]))
                 else:
-                    pretks.append((t, (-12, '')))
+                    pretks.append((t, (-12, "")))
                 res = max(res, self.dfs_(chars, e, pretks, tkslist))
 
         if res > s:
             return res
 
-        t = "".join(chars[s:s + 1])
+        t = "".join(chars[s : s + 1])
         k = self.key_(t)
         if k in self.trie_:
             preTks.append((t, self.trie_[k]))
         else:
-            preTks.append((t, (-12, '')))
+            preTks.append((t, (-12, "")))
 
         return self.dfs_(chars, s + 1, preTks, tkslist)
 
@@ -178,8 +172,8 @@ class RagTokenizer:
             tks.append(tk)
         F /= len(tks)
         L /= len(tks)
-        if self.DEBUG:
-            print("[SC]", tks, len(tks), L, F, B / len(tks) + L + F)
+
+        logging.debug("[SC]", tks, len(tks), L, F, B / len(tks) + L + F)
         return tks, B / len(tks) + L + F
 
     def sortTks_(self, tkslist):
@@ -219,8 +213,7 @@ class RagTokenizer:
         while s < len(line):
             e = s + 1
             t = line[s:e]
-            while e < len(line) and self.trie_.has_keys_with_prefix(
-                    self.key_(t)):
+            while e < len(line) and self.trie_.has_keys_with_prefix(self.key_(t)):
                 e += 1
                 t = line[s:e]
 
@@ -231,7 +224,7 @@ class RagTokenizer:
             if self.key_(t) in self.trie_:
                 res.append((t, self.trie_[self.key_(t)]))
             else:
-                res.append((t, (0, '')))
+                res.append((t, (0, "")))
 
             s = e
 
@@ -254,37 +247,47 @@ class RagTokenizer:
             if self.key_(t) in self.trie_:
                 res.append((t, self.trie_[self.key_(t)]))
             else:
-                res.append((t, (0, '')))
+                res.append((t, (0, "")))
 
             s -= 1
 
         return self.score_(res[::-1])
 
     def english_normalize_(self, tks):
-        return [self.stemmer.stem(self.lemmatizer.lemmatize(t)) if re.match(r"[a-zA-Z_-]+$", t) else t for t in tks]
+        return [
+            (
+                self.stemmer.stem(self.lemmatizer.lemmatize(t))
+                if re.match(r"[a-zA-Z_-]+$", t)
+                else t
+            )
+            for t in tks
+        ]
 
     def tokenize(self, line):
         line = self._strQ2B(line).lower()
         line = self._tradi2simp(line)
         zh_num = len([1 for c in line if is_chinese(c)])
         if zh_num == 0:
-            return " ".join([self.stemmer.stem(self.lemmatizer.lemmatize(t)) for t in word_tokenize(line)])
+            return " ".join(
+                [
+                    self.stemmer.stem(self.lemmatizer.lemmatize(t))
+                    for t in word_tokenize(line)
+                ]
+            )
 
         arr = re.split(self.SPLIT_CHAR, line)
         res = []
         for L in arr:
-            if len(L) < 2 or re.match(
-                    r"[a-z\.-]+$", L) or re.match(r"[0-9\.-]+$", L):
+            if len(L) < 2 or re.match(r"[a-z\.-]+$", L) or re.match(r"[0-9\.-]+$", L):
                 res.append(L)
                 continue
-            # print(L)
 
             # use maxforward for the first time
             tks, s = self.maxForward_(L)
             tks1, s1 = self.maxBackward_(L)
-            if self.DEBUG:
-                print("[FW]", tks, s)
-                print("[BW]", tks1, s1)
+
+            logging.debug("[FW]", tks, s)
+            logging.debug("[BW]", tks1, s1)
 
             diff = [0 for _ in range(max(len(tks1), len(tks)))]
             for i in range(min(len(tks1), len(tks))):
@@ -310,14 +313,14 @@ class RagTokenizer:
                     e += 1
 
                 tkslist = []
-                self.dfs_("".join(tks[s:e + 1]), 0, [], tkslist)
+                self.dfs_("".join(tks[s : e + 1]), 0, [], tkslist)
                 res.append(" ".join(self.sortTks_(tkslist)[0][0]))
 
                 i = e + 1
 
         res = " ".join(self.english_normalize_(res))
-        if self.DEBUG:
-            print("[TKS]", self.merge_(res))
+
+        logging.debug("[TKS]", self.merge_(res))
         return self.merge_(res)
 
     def fine_grained_tokenize(self, tks):
@@ -362,22 +365,21 @@ class RagTokenizer:
 
 
 def is_chinese(s):
-    if s >= u'\u4e00' and s <= u'\u9fa5':
+    if s >= "\u4e00" and s <= "\u9fa5":
         return True
     else:
         return False
 
 
 def is_number(s):
-    if s >= u'\u0030' and s <= u'\u0039':
+    if s >= "\u0030" and s <= "\u0039":
         return True
     else:
         return False
 
 
 def is_alphabet(s):
-    if (s >= u'\u0041' and s <= u'\u005a') or (
-            s >= u'\u0061' and s <= u'\u007a'):
+    if (s >= "\u0041" and s <= "\u005a") or (s >= "\u0061" and s <= "\u007a"):
         return True
     else:
         return False
@@ -386,8 +388,7 @@ def is_alphabet(s):
 def naiveQie(txt):
     tks = []
     for t in txt.split(" "):
-        if tks and re.match(r".*[a-zA-Z]$", tks[-1]
-                            ) and re.match(r".*[a-zA-Z]$", t):
+        if tks and re.match(r".*[a-zA-Z]$", tks[-1]) and re.match(r".*[a-zA-Z]$", t):
             tks.append(" ")
         tks.append(t)
     return tks
@@ -402,45 +403,3 @@ loadUserDict = tokenizer.loadUserDict
 addUserDict = tokenizer.addUserDict
 tradi2simp = tokenizer._tradi2simp
 strQ2B = tokenizer._strQ2B
-
-
-if __name__ == '__main__':
-    tknzr = RagTokenizer(debug=True)
-    # huqie.addUserDict("/tmp/tmp.new.tks.dict")
-    tks = tknzr.tokenize(
-        "哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈")
-    print(tknzr.fine_grained_tokenize(tks))
-    tks = tknzr.tokenize(
-        "公开征求意见稿提出，境外投资者可使用自有人民币或外汇投资。使用外汇投资的，可通过债券持有人在香港人民币业务清算行及香港地区经批准可进入境内银行间外汇市场进行交易的境外人民币业务参加行（以下统称香港结算行）办理外汇资金兑换。香港结算行由此所产生的头寸可到境内银行间外汇市场平盘。使用外汇投资的，在其投资的债券到期或卖出后，原则上应兑换回外汇。")
-    print(tknzr.fine_grained_tokenize(tks))
-    tks = tknzr.tokenize(
-        "多校划片就是一个小区对应多个小学初中，让买了学区房的家庭也不确定到底能上哪个学校。目的是通过这种方式为学区房降温，把就近入学落到实处。南京市长江大桥")
-    print(tknzr.fine_grained_tokenize(tks))
-    tks = tknzr.tokenize(
-        "实际上当时他们已经将业务中心偏移到安全部门和针对政府企业的部门 Scripts are compiled and cached aaaaaaaaa")
-    print(tknzr.fine_grained_tokenize(tks))
-    tks = tknzr.tokenize("虽然我不怎么玩")
-    print(tknzr.fine_grained_tokenize(tks))
-    tks = tknzr.tokenize("蓝月亮如何在外资夹击中生存,那是全宇宙最有意思的")
-    print(tknzr.fine_grained_tokenize(tks))
-    tks = tknzr.tokenize(
-        "涡轮增压发动机num最大功率,不像别的共享买车锁电子化的手段,我们接过来是否有意义,黄黄爱美食,不过，今天阿奇要讲到的这家农贸市场，说实话，还真蛮有特色的！不仅环境好，还打出了")
-    print(tknzr.fine_grained_tokenize(tks))
-    tks = tknzr.tokenize("这周日你去吗？这周日你有空吗？")
-    print(tknzr.fine_grained_tokenize(tks))
-    tks = tknzr.tokenize("Unity3D开发经验 测试开发工程师 c++双11双11 985 211 ")
-    print(tknzr.fine_grained_tokenize(tks))
-    tks = tknzr.tokenize(
-        "数据分析项目经理|数据分析挖掘|数据分析方向|商品数据分析|搜索数据分析 sql python hive tableau Cocos2d-")
-    print(tknzr.fine_grained_tokenize(tks))
-    if len(sys.argv) < 2:
-        sys.exit()
-    tknzr.DEBUG = False
-    tknzr.loadUserDict(sys.argv[1])
-    of = open(sys.argv[2], "r")
-    while True:
-        line = of.readline()
-        if not line:
-            break
-        print(tknzr.tokenize(line))
-    of.close()

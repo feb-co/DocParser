@@ -699,6 +699,3 @@ def get_names(id):
     p = get_names(d["parent"])
     if p: nms.extend(p)
     return nms
-
-if __name__ == "__main__":
-    print(get_names("1119"))

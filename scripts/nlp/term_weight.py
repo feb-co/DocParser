@@ -18,6 +18,7 @@ import math
 import json
 import re
 import os
+import logging
 import numpy as np
 
 from scripts.file_utils import get_project_base_directory
@@ -83,11 +84,12 @@ class Dealer:
         try:
             self.ne = json.load(open(os.path.join(fnm, "ner.json"), "r"))
         except Exception as e:
-            print("[WARNING] Load ner.json FAIL!")
+            logging.error("[WARNING] Load ner.json FAIL!")
+        
         try:
             self.df = load_dict(os.path.join(fnm, "term.freq"))
         except Exception as e:
-            print("[WARNING] Load term.freq FAIL!")
+            logging.error("[WARNING] Load term.freq FAIL!")
 
     def pretoken(self, txt, num=False, stpwd=True):
         patt = [

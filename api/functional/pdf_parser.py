@@ -88,7 +88,7 @@ def get_document_total_pages(
 def main():
     import argparse
     from scripts.file_utils import init_file_path
-    from scripts.postprocess import PdfPostprocess, PdfMode, PdfObject
+    from scripts.postprocess import PdfPostprocess, PdfMode
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
