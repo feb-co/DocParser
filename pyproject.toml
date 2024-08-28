@@ -63,12 +63,9 @@ dependencies = [
 Homepage = "https://github.com/feb-co/DocParser"
 
 [project.scripts]
-docparser-pdf = "api.functional.pdf_parser:main"
-docparser-html = "api.functional.html_parser:main"
+docparser-pdf = "docparser_feb.api.functional.pdf_parser:main"
+docparser-html = "docparser_feb.api.functional.html_parser:main"
 
-[tool.setuptools]
-packages = ["api", "api.functional", "src"]
-package-dir = {"" = "."}
 
 [tool.setuptools_scm]
 write_to = "_version.py"
