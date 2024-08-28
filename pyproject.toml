@@ -71,5 +71,5 @@ package-dir = {"" = "api/functional"}
 
 [tool.setuptools_scm]
 write_to = "_version.py"
-version_scheme = "post-release"
+version_scheme = "no-guess-dev"
 local_scheme = "no-local-version"
