@@ -64,7 +64,40 @@ class Nougat(object):
         )
         self.model.eval()
         self.name = "nougat"
+        self.model.decoder.model.prepare_inputs_for_generation = self.prepare_inputs_for_inference
         self.batchsize = batchsize
+    
+    def prepare_inputs_for_inference(
+        self,
+        input_ids: torch.Tensor,
+        encoder_outputs: torch.Tensor,
+        past=None,
+        past_key_values=None,
+        use_cache: bool = None,
+        attention_mask: torch.Tensor = None,
+        cache_position=None,
+    ):
+        """
+        Args:
+            input_ids: (batch_size, sequence_length)
+
+        Returns:
+            input_ids: (batch_size, sequence_length)
+            attention_mask: (batch_size, sequence_length)
+            encoder_hidden_states: (batch_size, sequence_length, embedding_dim)
+        """
+        attention_mask = input_ids.ne(self.model.decoder.tokenizer.pad_token_id).long()
+        past = past or past_key_values
+        if past is not None:
+            input_ids = input_ids[:, -1:]
+        output = {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "past_key_values": past,
+            "use_cache": use_cache,
+            "encoder_hidden_states": encoder_outputs.last_hidden_state,
+        }
+        return output
 
     def __call__(self, images: list):
         dataset = NougatDataset(
