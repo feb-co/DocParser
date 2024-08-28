@@ -21,7 +21,8 @@ roman-numbers==1.0.2
 shapely==2.0.3
 StrEnum==0.4.15
 tika
-transformers==4.38.2
+transformers
+tokenizers==0.19.1
 word2number==1.1
 xgboost==2.0.3
 langdetect
