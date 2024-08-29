@@ -52,6 +52,7 @@ dependencies = [
     "shapely==2.0.3",
     "StrEnum==0.4.15",
     "tika",
+    "tiktoken",
     "transformers",
     "tokenizers==0.19.1",
     "word2number==1.1",
