@@ -3,6 +3,7 @@ import asyncio
 import aiohttp
 import logging
 from tqdm import tqdm
+from bs4 import BeautifulSoup
 from tqdm.asyncio import tqdm_asyncio
 
 from docparser_feb.scripts.log_level import LOGING_MAP
@@ -12,8 +13,9 @@ logging.getLogger().setLevel(LOGING_MAP[log_level])
 
 
 class HtmlParser:
-    def __init__(self, jina_key: str, is_cache=True, timeout=10, disable_tqdm=False):
-        self.jina_prefix = "https://r.jina.ai/"
+    def __init__(self, jina_key: str, is_cache=True, timeout=10, disable_tqdm=False, fast=False):
+        self.fast = fast
+        self.jina_prefix = "https://r.jina.ai/" if not fast else ""
         self.jina_key = jina_key
 
         self.headers = {
@@ -26,6 +28,16 @@ class HtmlParser:
 
         self.timeout = aiohttp.ClientTimeout(total=timeout)
         self.disable_tqdm = disable_tqdm
+
+    def extract_core_text(self, html_content):
+        if html_content is not None:
+            soup = BeautifulSoup(html_content, 'html.parser')
+            core_text = ""
+            for p in soup.find_all('p'):
+                core_text += p.get_text() + "\n"
+            return core_text.strip()
+        else:
+            return None
 
     def scrape_page(self, url: str):
         response_text = asyncio.run(self.ascrape_page(url))
@@ -41,6 +53,8 @@ class HtmlParser:
                     self.jina_prefix + url, headers=self.headers
                 ) as response:
                     response_text = await response.text()
+                    if self.fast:
+                        response_text = self.extract_core_text(response_text)
                     return response_text
         except Exception as e:
             return await self.ascrape_page(url, try_time + 1)

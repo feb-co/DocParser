@@ -1,40 +1,34 @@
 import os
+import asyncio
+
 from docparser_feb.src.parser.html_parser import HtmlParser
 
 
 os.environ["NO_ALBUMENTATIONS_UPDATE"] = "1"
 
 
-def parser_html(
-    url_list: list,
-    is_cache=True,
-    timeout=10,
-    disable_tqdm=False,
-):
-    parser = HtmlParser(
-        os.getenv("JINA_KEY", ""),
-        is_cache,
-        timeout,
-        disable_tqdm,
-    )
-    results = parser.scrape_all_page(url_list)
-    return results
-
-
-async def aparser_html(
-    url_list: list,
-    is_cache=True,
-    timeout=10,
-    disable_tqdm=False,
-):
-    parser = HtmlParser(
-        os.getenv("JINA_KEY", ""),
-        is_cache,
-        timeout,
-        disable_tqdm,
-    )
-    results = await parser.ascrape_all_page(url_list)
-    return results
+class FebHtmlParser(HtmlParser):
+    def __call__(self, url_list: list, async_mode: bool = False):
+        if async_mode:
+            return self._async_call(url_list)
+        else:
+            return self._sync_call(url_list)
+    
+    def _sync_call(self, url_list: list):
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # 如果事件循环已经在运行，使用新的事件循环
+            new_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(new_loop)
+            results = new_loop.run_until_complete(self._async_call(url_list))
+            new_loop.close()
+            return results
+        else:
+            return loop.run_until_complete(self._async_call(url_list))
+    
+    async def _async_call(self, url_list: list):
+        results = await self.ascrape_all_page(url_list)
+        return results
 
 
 def main():
@@ -63,6 +57,11 @@ def main():
         action="store_true",
         help="If the parsed target file already exists, should it be rewritten? Default: False.",
     )
+    parser.add_argument(
+        "--fast",
+        action="store_true",
+        help="get text without markdown.",
+    )
     args = parser.parse_args()
 
     if is_url(args.input):
@@ -72,7 +71,14 @@ def main():
     else:
         raise TypeError("Not support other file types, only support url or a .txt file")
 
-    page_texts = parser_html(url_list)
+    html_parser = FebHtmlParser(
+        os.getenv("JINA_KEY", ""),
+        is_cache=True,
+        timeout=10,
+        disable_tqdm=False,
+        fast=args.fast
+    )
+    page_texts = asyncio.run(html_parser(url_list, True))
     post_process_obj = HtmlPostprocess(
         use_llm=bool(args.use_llm),
     )
