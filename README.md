@@ -85,4 +85,6 @@ You can run the following script to get the html parsing results:
 docparser-html https://github.com/mem0ai/mem0
 ```
 
+The following is a description of the relevant parameters:
+
 #### From Python
